@@ -19,6 +19,7 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { execFile } from 'node:child_process'
 import { OWNED } from './host/owned.js'
+import { countSubagents } from './host/history.js'
 import { TOKEN } from './host/token.js'
 
 const CLAUDE_DIR = join(homedir(), '.claude')
@@ -299,6 +300,14 @@ async function collect(options = {}) {
     if (a.live !== b.live) return a.live ? -1 : 1
     return (b.mtime ?? b.startedAt ?? 0) - (a.mtime ?? a.startedAt ?? 0)
   })
+  // Only the panel asks for badges; the agent tools do not need one readdir per row.
+  if (options.subagentCounts) {
+    await Promise.all(
+      sessions.map(async (row) => {
+        row.subagents = await countSubagents(row.path)
+      }),
+    )
+  }
   return {
     generatedAt: new Date().toISOString(),
     liveSource: agents ? 'claude agents --json' : 'session registry',
@@ -781,7 +790,7 @@ export function apply(ctx) {
               const limit = Number.isFinite(limitRaw) ? Math.max(1, Math.min(2000, Math.trunc(limitRaw))) : MAX_RECORDED
               const offsetRaw = Number(url.searchParams.get('offset'))
               const offset = Number.isFinite(offsetRaw) ? Math.max(0, Math.trunc(offsetRaw)) : 0
-              return Response.json(await collect({ limit, offset }))
+              return Response.json(await collect({ limit, offset, subagentCounts: true }))
             }
             if (path === '/_ccpanel/digest') {
               const id = url.searchParams.get('id') ?? ''

@@ -8,7 +8,7 @@ import { mkdir, mkdtemp, readdir, stat, writeFile } from 'node:fs/promises'
 import { homedir, tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
-import { fullTool, historyFor, parseTranscript } from '../host/history.js'
+import { countSubagents, fullTool, historyFor, parseTranscript } from '../host/history.js'
 import { pdfFile, previewFile } from '../host/files.js'
 import { RUNTIMES, runtimeFor } from '../host/engine.js'
 import { registerChatRoutes } from '../host/routes.js'
@@ -46,6 +46,13 @@ await writeFile(transcript, records.map((record) => JSON.stringify(record)).join
 const parsed = parseTranscript(records.map((record) => JSON.stringify(record)).join('\n'))
 check('解析：用户/助手/工具/结果', parsed.length === 4, `${parsed.length} items`)
 check('解析：工具名挂到结果上', parsed[3]?.name === 'Read', parsed[3]?.name ?? '(none)')
+
+/* 1b. subagent badge counts (session row shows 子代理（N）) */
+await mkdir(join(dir, 't', 'subagents'), { recursive: true })
+await writeFile(join(dir, 't', 'subagents', 'agent-a.meta.json'), '{}')
+await writeFile(join(dir, 't', 'subagents', 'agent-a.jsonl'), '')
+check('子代理计数：列表徽标', (await countSubagents(transcript)) === 1, '1 meta')
+check('子代理计数：无目录返回 0', (await countSubagents(join(dir, 'none.jsonl'))) === 0)
 
 /* 2. file preview */
 const sample = join(dir, 'a.txt')

@@ -821,7 +821,7 @@ window.__ModuleLoader__.load({
     /* ── rows ────────────────────────────────────────────────────────── */
 
     const GRID = '26px 86px minmax(150px,1.5fr) minmax(110px,1fr) 92px auto'
-    function Row({ row, selected, onToggleSelect, onTakeOver, onOpen, onRelease }) {
+    function Row({ row, selected, onToggleSelect, onTakeOver, onOpen, onRelease, onSubagents }) {
       const [open, setOpen] = React.useState(false)
       const [busy, setBusy] = React.useState(false)
       const [hover, setHover] = React.useState(false)
@@ -965,6 +965,16 @@ window.__ModuleLoader__.load({
                     title: '在面板里看完整对话并继续',
                   },
                   '对话',
+                )
+              : null,
+            row.subagents > 0 && onSubagents
+              ? h(
+                  GhostButton,
+                  {
+                    onClick: () => onSubagents(row),
+                    title: `查看这个会话的 ${row.subagents} 个子代理过程`,
+                  },
+                  `子代理（${row.subagents}）`,
                 )
               : null,
             resumable
@@ -1293,9 +1303,11 @@ window.__ModuleLoader__.load({
               'span',
               {
                 key: `${key}-p${pIndex++}`,
-                title: `预览 ${target}`,
-                onClick: () => onOpenPath(target),
-                style: { color: T.accentText, textDecoration: 'underline dotted', cursor: 'pointer' },
+                title: onOpenPath ? `预览 ${target}` : undefined,
+                onClick: onOpenPath ? () => onOpenPath(target) : undefined,
+                style: onOpenPath
+                  ? { color: T.accentText, textDecoration: 'underline dotted', cursor: 'pointer' }
+                  : { color: T.text },
               },
               target,
             ),
@@ -1320,10 +1332,12 @@ window.__ModuleLoader__.load({
                 'code',
                 {
                   key,
-                  title: `预览 ${target}`,
-                  onClick: () => onOpenPath(target),
+                  title: onOpenPath ? `预览 ${target}` : undefined,
+                  onClick: onOpenPath ? () => onOpenPath(target) : undefined,
                   className: 'ccs-path',
-                  style: { ...CODE_STYLE, cursor: 'pointer', color: T.accentText, textDecoration: 'underline dotted' },
+                  style: onOpenPath
+                    ? { ...CODE_STYLE, cursor: 'pointer', color: T.accentText, textDecoration: 'underline dotted' }
+                    : CODE_STYLE,
                 },
                 code,
               ),
@@ -2343,7 +2357,7 @@ window.__ModuleLoader__.load({
     }
 
     /** Session-level subagent explorer: independent of which Task cards are in the window. */
-    function SubagentPane({ sessionId, list, selected, onSelect, onClose, cwd, onOpenPath }) {
+    function SubagentPane({ sessionId, list, selected, onSelect, onClose, cwd, onOpenPath, floating }) {
       const [data, setData] = React.useState(null)
       const [error, setError] = React.useState('')
       React.useEffect(() => {
@@ -2383,17 +2397,26 @@ window.__ModuleLoader__.load({
       return h(
         'div',
         {
-          style: {
-            flex: '0 0 42%',
-            minWidth: 300,
-            maxWidth: 760,
-            minHeight: 0,
-            display: 'flex',
-            flexDirection: 'column',
-            borderLeft: `1px solid ${T.line}`,
-            background: T.base,
-            boxShadow: '-12px 0 32px rgba(15,23,42,0.06)',
-          },
+          style: floating
+            ? {
+                flex: '1 1 auto',
+                minWidth: 0,
+                minHeight: 0,
+                display: 'flex',
+                flexDirection: 'column',
+                background: T.base,
+              }
+            : {
+                flex: '0 0 42%',
+                minWidth: 300,
+                maxWidth: 760,
+                minHeight: 0,
+                display: 'flex',
+                flexDirection: 'column',
+                borderLeft: `1px solid ${T.line}`,
+                background: T.base,
+                boxShadow: '-12px 0 32px rgba(15,23,42,0.06)',
+              },
         },
         h(
           'div',
@@ -2468,6 +2491,46 @@ window.__ModuleLoader__.load({
                       }),
                     ),
                   ],
+        ),
+      )
+    }
+
+    /** Floating shell so the list can open a session's subagents without entering it. */
+    function SubagentDrawer({ view, onClose }) {
+      const [selected, setSelected] = React.useState(null)
+      return h(
+        'div',
+        { style: { position: 'absolute', inset: 0, zIndex: 80 } },
+        h('div', {
+          onClick: onClose,
+          style: { position: 'absolute', inset: 0, background: 'rgba(15,23,42,0.18)' },
+        }),
+        h(
+          'div',
+          {
+            style: {
+              position: 'absolute',
+              top: 0,
+              right: 0,
+              bottom: 0,
+              width: 'min(680px, 100%)',
+              minWidth: 320,
+              display: 'flex',
+              flexDirection: 'column',
+              background: T.base,
+              borderLeft: `1px solid ${T.line}`,
+              boxShadow: '-18px 0 48px rgba(0,0,0,0.20)',
+            },
+          },
+          h(SubagentPane, {
+            floating: true,
+            sessionId: view.sessionId,
+            list: view.list,
+            selected,
+            onSelect: setSelected,
+            onClose,
+            cwd: view.cwd,
+          }),
         ),
       )
     }
@@ -3452,6 +3515,7 @@ window.__ModuleLoader__.load({
       const [selected, setSelected] = React.useState([])
       const [tick, setTick] = React.useState(0)
       const [chat, setChat] = React.useState(null)
+      const [subView, setSubView] = React.useState(null)
       const [chatEnabled, setChatEnabled] = React.useState(true)
       const [limit, setLimit] = React.useState(200)
 
@@ -3582,6 +3646,20 @@ window.__ModuleLoader__.load({
         })
       }, [])
 
+      const openSubagents = React.useCallback((row) => {
+        getJson(`${CHAT}/subagents?session=${encodeURIComponent(row.id)}`)
+          .then((payload) => {
+            setSubView({
+              sessionId: row.id,
+              cwd: row.cwd || '',
+              list: Array.isArray(payload?.subagents) ? payload.subagents : [],
+            })
+          })
+          .catch((cause) =>
+            setNotice({ text: `读取子代理失败：${String(cause?.message ?? cause)}`, tone: T.err }),
+          )
+      }, [])
+
       const openDraft = React.useCallback(async () => {
         try {
           const picked = await postJson('/_ccpanel/pick-dir', {})
@@ -3608,6 +3686,7 @@ window.__ModuleLoader__.load({
         {
           style: {
             height: '100%',
+            position: 'relative',
             display: 'flex',
             flexDirection: 'column',
             color: T.text,
@@ -3889,9 +3968,17 @@ window.__ModuleLoader__.load({
                   onTakeOver,
                   onRelease: releaseSession,
                   onOpen: chatEnabled ? openChat : undefined,
+                  onSubagents: chatEnabled ? openSubagents : undefined,
                 }),
               ),
         ),
+        subView
+          ? h(SubagentDrawer, {
+              key: subView.sessionId,
+              view: subView,
+              onClose: () => setSubView(null),
+            })
+          : null,
       )
     }
 
@@ -3912,7 +3999,7 @@ window.__ModuleLoader__.load({
 
     return {
       inject: ['slots'],
-      __test: { SessionsPanel, Row, ChatView, MessageList, QuestionCard, ToolCard },
+      __test: { SessionsPanel, Row, ChatView, MessageList, QuestionCard, ToolCard, SubagentDrawer },
       apply(ctx) {
         ROOT = ctx
         ctx.slots.inject('main', () => ctx.slots.register({ name: 'main', key: PANEL_ID }, SessionsPanel))

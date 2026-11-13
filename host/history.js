@@ -335,6 +335,21 @@ export async function subagentFor(sessionFile, toolUseId) {
 }
 
 
+/** Count recorded subagents without parsing their metadata (list view badges). */
+export async function countSubagents(sessionFile) {
+  if (!sessionFile) return 0
+  const dir = join(dirname(sessionFile), basename(sessionFile, '.jsonl'), 'subagents')
+  try {
+    const entries = await readdir(dir)
+    let count = 0
+    for (const entry of entries) if (entry.endsWith('.meta.json')) count += 1
+    return count
+  } catch {
+    return 0
+  }
+}
+
+
 /** All subagents recorded for one session (metadata only; items load on demand). */
 export async function listSubagents(sessionFile) {
   if (!sessionFile) return []
