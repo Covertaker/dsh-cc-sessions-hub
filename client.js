@@ -2203,9 +2203,25 @@ window.__ModuleLoader__.load({
       }, [path])
 
       const open = (reveal) => {
-        postJson('/_ccpanel/open', { path, reveal }).catch((error) =>
-          setState((prev) => ({ ...prev, actionError: String(error?.message ?? error) })),
-        )
+        postJson('/_ccpanel/open', { path, reveal })
+          .then((payload) => {
+            setState((prev) => ({
+              ...prev,
+              actionError: '',
+              actionNote: reveal
+                ? '已在 Finder 中显示'
+                : payload?.editor
+                  ? '系统没有默认应用，已用文本编辑器打开'
+                  : '已交给系统默认应用打开',
+            }))
+          })
+          .catch((error) =>
+            setState((prev) => ({
+              ...prev,
+              actionNote: '',
+              actionError: String(error?.message ?? error),
+            })),
+          )
       }
 
       return h(
@@ -2239,10 +2255,47 @@ window.__ModuleLoader__.load({
             { title: path, style: { flex: '1 1 auto', minWidth: 0, fontFamily: MONO, fontSize: 11, color: T.sub, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } },
             path,
           ),
-          h(GhostButton, { onClick: () => open(false) }, '打开'),
-          h(GhostButton, { onClick: () => open(true) }, 'Finder'),
+          h(
+            GhostButton,
+            {
+              onClick: () => open(false),
+              title: '用系统默认应用打开（没有默认应用时用文本编辑器）',
+            },
+            '打开',
+          ),
+          h(GhostButton, { onClick: () => open(true), title: '在 Finder 中显示' }, 'Finder'),
           h(GhostButton, { onClick: onClose }, '关闭'),
         ),
+        state.actionError
+          ? h(
+              'div',
+              {
+                style: {
+                  padding: '5px 10px',
+                  fontSize: 11,
+                  color: T.err,
+                  background: T.layer1,
+                  borderBottom: `${HAIRLINE} solid ${T.line}`,
+                  whiteSpace: 'pre-wrap',
+                },
+              },
+              state.actionError,
+            )
+          : state.actionNote
+            ? h(
+                'div',
+                {
+                  style: {
+                    padding: '5px 10px',
+                    fontSize: 11,
+                    color: T.ok,
+                    background: T.layer1,
+                    borderBottom: `${HAIRLINE} solid ${T.line}`,
+                  },
+                },
+                state.actionNote,
+              )
+            : null,
         h(
           'div',
           { style: { flex: '1 1 auto', minHeight: 0, overflow: 'auto' } },
@@ -2307,9 +2360,6 @@ window.__ModuleLoader__.load({
                             state.value?.reason || '该文件不支持内置预览，可用「打开」交给系统应用。',
                           ),
         ),
-        state.actionError
-          ? h('div', { style: { padding: '6px 10px', fontSize: 11, color: T.err, borderTop: `${HAIRLINE} solid ${T.line}` } }, state.actionError)
-          : null,
       )
     }
 
@@ -3472,7 +3522,6 @@ window.__ModuleLoader__.load({
                         },
                       }),
                       h(GhostButton, { onClick: () => setShowCommands((value) => !value) }, '命令'),
-                      h(GhostButton, { onClick: () => setText('') , disabled: !text }, '清空'),
                     ),
                     ),
                   ),

@@ -11,7 +11,7 @@ Claude Code 会话工作台，跑在 **DeepSeek Harness（DSH）桌面端**里�
 - **审批**：允许 / 始终允许（显示写入目标）/ 拒绝；并发审批分卡处理；AskUserQuestion 选择卡（选项、多选、自由输入）。
 - **会话设置**：权限模式（默认/计划/自动/接受编辑/不询问）、effort（跟随设置 → max）、思考显示开关；默认 **auto + xhigh + 思考显示关**。
 - **命令与 skills**：输入 `/` 或点「命令」出列表，skills 可直接调用；终端专属命令自动过滤。
-- **文件预览**：Markdown（含表格）、HTML（sandbox 禁脚本）、PDF、Word/ODT（本机 LibreOffice 转 PDF）、图片、文本。
+- **文件预览**：Markdown（含表格）、HTML（sandbox 禁脚本）、PDF、Word/ODT（本机 LibreOffice 转 PDF）、图片、文本；纯文本（如 `.jsonl`）没有默认应用时自动用文本编辑器打开。
 - **子代理过程**：会话行、对话标题栏都有「子代理（N）」入口，点开直接看，不必先进对话；Task/Agent 卡上也可展开单条。运行中每 1.2s 刷新。
 - **完整工具输出**：截断的结果可一键读取转录里的完整内容。
 

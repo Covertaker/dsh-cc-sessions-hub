@@ -202,10 +202,28 @@ export async function readImage(input) {
   }
 }
 
+/** Types macOS has no default handler for; fall back to TextEdit instead of failing. */
+const NO_DEFAULT_APP_FALLBACK = new Set(['.jsonl'])
+
 export function openWithDefaultApp(input) {
   const path = normalizePath(input)
   return new Promise((resolvePromise, reject) => {
     execFile('open', [path], { timeout: 15_000 }, (error) => {
+      if (!error) return resolvePromise({ editor: false })
+      if (!NO_DEFAULT_APP_FALLBACK.has(extname(path).toLowerCase())) return reject(error)
+      openWithEditor(path).then(
+        () => resolvePromise({ editor: true }),
+        () => reject(error),
+      )
+    })
+  })
+}
+
+/** Text-editor fallback for types macOS has no default handler for (e.g. .jsonl). */
+export function openWithEditor(input) {
+  const path = normalizePath(input)
+  return new Promise((resolvePromise, reject) => {
+    execFile('open', ['-a', 'TextEdit', path], { timeout: 15_000 }, (error) => {
       if (error) reject(error)
       else resolvePromise(true)
     })

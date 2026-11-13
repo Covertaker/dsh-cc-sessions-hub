@@ -653,9 +653,10 @@ async function handleOpen(request, response) {
   const body = await readBody(request)
   const target = String(body.path ?? '')
   if (!target) return sendJson(response, 400, { error: '缺少 path' })
+  let editor = false
   if (body.reveal === true) await revealInFinder(target)
-  else await openWithDefaultApp(target)
-  return sendJson(response, 200, { ok: true })
+  else editor = (await openWithDefaultApp(target))?.editor === true
+  return sendJson(response, 200, { ok: true, editor })
 }
 
 /* ── registration ──────────────────────────────────────────────────── */
