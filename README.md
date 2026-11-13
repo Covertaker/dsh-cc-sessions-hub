@@ -19,7 +19,7 @@ Claude Code 会话工作台，跑在 **DeepSeek Harness（DSH）桌面端**里�
 
 | 依赖 | 说明 |
 |---|---|
-| **DSH 桌面端** | 在 `0.2.2-rc.1` 上开发测试；插件使用其客户端私有服务（layout / sidebar / slots 等），**DSH 升级可能失效** |
+| **DSH 桌面端** | 在 `0.2.2-rc.2` 上测试（开发期亦覆盖 rc.1）；插件使用其客户端私有服务（layout / sidebar / slots 等），**DSH 升级可能失效** |
 | **Claude Code CLI** | 已在本机 `2.1.319` 上测试；需要已登录，`claude` 在 PATH 或 `CLAUDE_CODE_BIN` |
 | **Node.js** | ≥ 22（插件与 SDK 运行在 DSH 主进程） |
 | **macOS** | 文件「打开 / Finder」与 LibreOffice 路径按 macOS 实现；Windows/Linux 需自行适配 |
