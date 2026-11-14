@@ -20,13 +20,17 @@ import { join } from 'node:path'
 import { execFile } from 'node:child_process'
 import { OWNED } from './host/owned.js'
 import { countSubagents } from './host/history.js'
+import { CLAUDE_BIN } from './host/engine.js'
 
 const CLAUDE_DIR = join(homedir(), '.claude')
 const PLATFORM = process.platform
-const PLATFORM_WARNING =
-  PLATFORM === 'darwin'
-    ? ''
-    : `当前平台 ${PLATFORM} 未验证：文件打开、Finder 与部分路径逻辑依赖 macOS`
+/** macOS and Windows are both implemented; anything else keeps the warning. */
+const SUPPORTED_PLATFORMS = new Set(['darwin', 'win32'])
+const PLATFORM_WARNING = SUPPORTED_PLATFORMS.has(PLATFORM)
+  ? ''
+  : `当前平台 ${PLATFORM} 未验证：文件打开、资源管理器定位与部分路径逻辑按 macOS/Windows 实现`
+/** `claude` on Windows is a .cmd shim that spawn() cannot launch; use the resolved binary. */
+const CC_BIN = CLAUDE_BIN || 'claude'
 const PROJECTS_DIR = join(CLAUDE_DIR, 'projects')
 const SESSIONS_DIR = join(CLAUDE_DIR, 'sessions')
 const JOBS_DIR = join(CLAUDE_DIR, 'jobs')
@@ -159,7 +163,7 @@ function lastAiTitle(text) {
 
 function claudeAgents() {
   return new Promise((resolve) => {
-    execFile('claude', ['agents', '--json'], { timeout: 6000, maxBuffer: 8 * 1024 * 1024 }, (error, stdout) => {
+    execFile(CC_BIN, ['agents', '--json'], { timeout: 6000, maxBuffer: 8 * 1024 * 1024 }, (error, stdout) => {
       if (error) return resolve(null)
       try {
         const parsed = JSON.parse(stdout)
@@ -668,7 +672,7 @@ function registerTools(ctx) {
       const argv = ['--bg']
       if (args?.name) argv.push('--name', String(args.name))
       argv.push(prompt)
-      const result = await run('claude', argv, { cwd, timeout: 120_000 })
+      const result = await run(CC_BIN, argv, { cwd, timeout: 120_000 })
       const text = `${result.stdout}\n${result.stderr}`.trim()
       if (!result.ok) throw new Error(`claude --bg failed: ${text || result.error}`)
       const match = text.match(/\b([0-9a-f]{6,16})\b/i)
@@ -711,7 +715,7 @@ function registerTools(ctx) {
         const jobPath = join(JOBS_DIR, id)
         try {
           await stat(jobPath)
-          const result = await run('claude', ['logs', id], { timeout: 30_000 })
+          const result = await run(CC_BIN, ['logs', id], { timeout: 30_000 })
           const text = `${result.stdout}\n${result.stderr}`.trim()
           if (result.ok && text) {
             return { id, source: 'claude logs', text: text.split('\n').slice(-keep).join('\n') }
@@ -769,8 +773,8 @@ function registerTools(ctx) {
       if (row && row.kind !== 'background') {
         return { id, stopped: false, detail: 'this session is interactive; stop it from its own terminal' }
       }
-      const stop = await run('claude', ['stop', id], { timeout: 30_000 })
-      const remove = await run('claude', ['rm', id], { timeout: 30_000 })
+      const stop = await run(CC_BIN, ['stop', id], { timeout: 30_000 })
+      const remove = await run(CC_BIN, ['rm', id], { timeout: 30_000 })
       const detail = `stop: ${(stop.stderr || stop.stdout).trim()} | rm: ${(remove.stderr || remove.stdout).trim()}`
       return { id, stopped: stop.ok || remove.ok, detail: detail.slice(0, 1000) }
     },

@@ -22,14 +22,14 @@ Claude Code 会话工作台，跑在 **DeepSeek Harness（DSH）桌面端**里�
 
 | 依赖 | 说明 |
 |---|---|
-| **DSH 桌面端** | 在 `0.2.2-rc.2` 上测试（开发期亦覆盖 rc.1）；插件使用其客户端私有服务（layout / sidebar / slots 等），**DSH 升级可能失效** |
-| **Claude Code CLI** | 已在本机 `2.1.323` 上测试；需要已登录，`claude` 在 PATH 或 `CLAUDE_CODE_BIN` |
+| **DSH 桌面端** | 在 `0.2.2-rc.2` 上测试（开发期亦覆盖 rc.1）；**Windows 于 `0.2.2-rc.3` 复验**。插件使用其客户端私有服务（layout / sidebar / slots 等），**DSH 升级可能失效** |
+| **Claude Code CLI** | 已在 `2.1.325`（Windows）/ `2.1.323`（macOS）上测试；需要已登录，`claude` 在 PATH 或 `CLAUDE_CODE_BIN` |
 | **Agent SDK** | 钉在 `@anthropic-ai/claude-agent-sdk@0.3.323`（内置 CLI 2.1.323） |
 | **Node.js** | ≥ 22（插件与 SDK 运行在 DSH 主进程） |
-| **macOS** | 文件「打开 / Finder」与 LibreOffice 路径按 macOS 实现；Windows/Linux 需自行适配 |
-| **LibreOffice**（可选） | Word/ODT 预览需要；未装时提示"用系统应用打开" |
+| **系统** | macOS 与 Windows 均已实现；Linux 未验证。文件「打开 / 定位」按平台分派（Finder / 资源管理器） |
+| **LibreOffice**（可选） | Word/ODT 预览需要；**Windows 上缺省回落到 DSH 桌面端自带的 `@deepseek-ai/libreoffice-kit`**（免装 LibreOffice），两者都没有时提示"用系统应用打开" |
 
-> CLI 版本与测试版（`2.1.323`）不一致时，对话页顶部会显示黄条提示；不阻断使用。
+> CLI 版本与测试版（`2.1.323` / `2.1.325`）不一致时，对话页顶部会显示黄条提示；不阻断使用。
 
 ## 安装
 
@@ -43,6 +43,12 @@ dsh plugin --profile desktop add link:$PWD
 ```
 
 > `package-lock.json` 指向官方 npm 源；网络受限时可配置镜像，npm 会按 `replace-registry-host` 改写。
+
+**Windows**：`desktop` profile 由桌面端独占，用 PATH 上的 `dsh` 会直接报错（`profile "desktop" is managed exclusively by the Electron application`）。改用桌面端自带的 CLI：
+
+```bash
+"%LOCALAPPDATA%\Programs\DeepSeek Harness\resources\runtime\cli\bin\dsh.cmd" plugin --profile desktop add "link:D:/path/to/dsh-cc-sessions-hub"
+```
 
 确认 `~/.dsh/profiles/desktop/package.json` 的 `dsh.profile.bundles` 里有 `dsh-cc-sessions-hub`；没有则手动加入。**完全退出并重启 DSH**。
 
@@ -69,14 +75,15 @@ dsh plugin --profile desktop add link:$PWD
 
 - 插件在**本机 loopback** 上注册 HTTP 路由。**仅适用于 DSH 绑定 loopback 的场景：不要把 DSH 端口暴露到网络或反向代理。**
 - **token 只用于阻止浏览器跨站请求（CSRF），不是身份认证**：`/chat/token` 对不带 `sec-fetch-site` 的本地客户端也会返回 token；`/_ccpanel/sessions|digest|merge|diag` 只校验 loopback Host。其余 `/chat/*`、`/file/*`、`/pick-dir`、`/open` 需要 `x-cc-hub-token`（`/file/raw` 图片流除外，`<img>` 不能带 header）。
-- **文件预览可读任意绝对路径**；「打开」会调用系统默认应用（`open`），「Finder」会 `open -R`。仅在本机可信环境使用。
+- **文件预览可读任意绝对路径**；「打开」会调用系统默认应用（macOS `open` / Windows `cmd start` + `rundll32` 兜底），「Finder / 资源管理器」会定位到文件（`open -R` / `explorer /select`）。仅在本机可信环境使用。
 - 插件**不含遥测**，不会把会话内容发往任何地方（除了 Claude Code 自身的模型/API 请求）。
 - 面板会话与终端会话使用同一份 `~/.claude` 配置、hooks 与转录；权限行为与终端一致。
 
 ## 已知限制
 
 - DSH 私有客户端服务可能随版本升级变化；升级后请先打开面板验证。
-- 仅 macOS 验证；文件打开/Word 预览路径为 macOS。
+- macOS 与 Windows 均已验证（Windows：DSH 桌面端 0.2.2-rc.3 / CC 2.1.325）；Linux 未验证。
+- **Windows 的 `claude` 是 .cmd 壳**：插件会解析出它指向的原生 `claude.exe` 再交给 SDK——直接 spawn `.cmd` 会被 Node 拒绝（EINVAL）。`CLAUDE_CODE_BIN` 指到 `.cmd`/`.bat` 同样无效，请指 `.exe`。
 - 历史默认渲染最近 250 条，更多用「加载更早」。
 - 工具输出在传输中截断（结果 2500 字、输入 1200 字）；完整内容按需读取。
 - **短回答可能直接出结果**：单分片回答的 partial 窗口只有几毫秒，SSE 也可能看不到逐字；长回答可见。

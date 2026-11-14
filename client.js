@@ -8,6 +8,27 @@ window.__ModuleLoader__.load({
     const ENDPOINT = '/_ccpanel/sessions'
     const WAIT_STEP_MS = 60
 
+    // Host OS decides path rules and the label of the "reveal" verb. The
+    // renderer runs on the same machine as the host, so userAgent is a safe
+    // first guess; /_ccpanel/diag then confirms it.
+    let HOST_PLATFORM = /Windows/i.test(String(globalThis.navigator?.userAgent ?? '')) ? 'win32' : ''
+    const IS_WIN = () => HOST_PLATFORM === 'win32'
+    const REVEAL_LABEL = () => (IS_WIN() ? '资源管理器' : 'Finder')
+    /** Absolute as either OS spells it: /x, ~/x, C:\x, C:/x, \\server\share. */
+    function isAbsolutePath(text) {
+      return (
+        /^[A-Za-z]:[\\/]/.test(text) ||
+        text.startsWith('\\\\') ||
+        text.startsWith('/') ||
+        text.startsWith('~/') ||
+        text.startsWith('~\\')
+      )
+    }
+    /** Directory part of a path, in either separator style. */
+    function dirName(path) {
+      return String(path ?? '').replace(/[\\/][^\\/]*$/, '')
+    }
+
     // All colours come from the host theme tokens (authoritative names from
     // @deepseek-ai/dsh-client-ui-theme). Fallbacks only cover a renamed token.
     const T = {
@@ -1265,16 +1286,19 @@ window.__ModuleLoader__.load({
     function looksLikePath(value) {
       const text = String(value ?? '').trim()
       if (!text || /\s/.test(text) || text.includes('://')) return false
-      if (text.startsWith('/') || text.startsWith('~/')) return true
-      return /^[\w.@+-]+\/[\w.@+/-]+$/.test(text)
+      if (isAbsolutePath(text)) return true
+      return /^[\w.@+-]+[/\\][\w.@+/-]+$/.test(text)
     }
 
     function resolvePath(value, cwd) {
       const text = String(value ?? '').trim()
       if (!text) return ''
-      if (text.startsWith('/') || text.startsWith('~/')) return text
+      if (isAbsolutePath(text)) return text
       if (!cwd) return ''
-      return `${cwd.replace(/\/+$/, '')}/${text}`
+      // Join with the separator the working directory already uses, so a
+      // Windows cwd does not grow POSIX slashes (and vice versa).
+      const sep = cwd.includes('\\') && !cwd.includes('/') ? '\\' : '/'
+      return `${cwd.replace(/[\\/]+$/, '')}${sep}${text}`
     }
 
     const CODE_STYLE = {
@@ -1288,7 +1312,9 @@ window.__ModuleLoader__.load({
     function inlineNodes(text, keyPrefix, onOpenPath, cwd) {
       const nodes = []
       const pattern = /(`[^`\n]+`|\*\*[^*\n]+\*\*|\*[^*\n]+\*|\[[^\]\n]+\]\([^)\s]+\))/g
-      const pathPattern = /(^|[\s(（])((?:\/Users|\/private|\/tmp|\/opt|\/Applications|\/Volumes)\/[^\s)）`,;，。；]+)/g
+      // POSIX paths are recognised by their well-known roots; Windows ones need
+      // no root list, the drive letter (or UNC prefix) is the marker.
+      const pathPattern = /(^|[\s(（"'])((?:[A-Za-z]:[\\/][^\s)）`,;，。；"']*|\\\\[^\s)）`,;，。；"']*|\/(?:Users|private|tmp|opt|Applications|Volumes)\/[^\s)）`,;，。；]+))/g
       const pushPlain = (plain, key) => {
         let cursor = 0
         let pIndex = 0
@@ -2209,7 +2235,7 @@ window.__ModuleLoader__.load({
               ...prev,
               actionError: '',
               actionNote: reveal
-                ? '已在 Finder 中显示'
+                ? `已在${REVEAL_LABEL()}中显示`
                 : payload?.editor
                   ? '系统没有默认应用，已用文本编辑器打开'
                   : '已交给系统默认应用打开',
@@ -2263,7 +2289,7 @@ window.__ModuleLoader__.load({
             },
             '打开',
           ),
-          h(GhostButton, { onClick: () => open(true), title: '在 Finder 中显示' }, 'Finder'),
+          h(GhostButton, { onClick: () => open(true), title: `在${REVEAL_LABEL()}中显示` }, REVEAL_LABEL()),
           h(GhostButton, { onClick: onClose }, '关闭'),
         ),
         state.actionError
@@ -2313,7 +2339,7 @@ window.__ModuleLoader__.load({
                   ? h(
                       'div',
                       { style: { padding: '10px 14px', fontSize: FS, color: T.text, lineHeight: 1.65 } },
-                      markdownBlocks(state.value.text, onOpenPath ?? (() => {}), path.replace(/\/[^/]*$/, '')),
+                      markdownBlocks(state.value.text, onOpenPath ?? (() => {}), dirName(path)),
                       state.value.truncated ? h('div', { style: { color: T.caption, fontSize: 11 } }, '…（文件过大，只显示前 600KB）') : null,
                     )
                   : state.value?.kind === 'html'
@@ -2603,12 +2629,32 @@ window.__ModuleLoader__.load({
         if (!value || value.startsWith('#')) continue
         try {
           const url = new URL(value)
-          if (url.protocol === 'file:' && url.pathname) out.push(decodeURIComponent(url.pathname))
+          if (url.protocol !== 'file:') continue
+          let path = decodeURIComponent(url.pathname)
+          if (url.host && url.host !== 'localhost') {
+            // file://server/share/x → \\server\share\x
+            path = `\\\\${url.host}${path.replace(/\//g, '\\')}`
+          } else if (/^\/[A-Za-z]:[\\/]/.test(path)) {
+            // file:///C:/x → C:/x
+            path = path.slice(1)
+          }
+          if (path) out.push(path)
         } catch {
           /* not a URL */
         }
       }
       return out
+    }
+
+    /** A pasted plain string that is clearly a local absolute path. */
+    function isLikelyPastedPath(value) {
+      const text = String(value ?? '').trim()
+      if (!text || text.includes('\n')) return false
+      if (/^[A-Za-z]:[\\/]/.test(text) || text.startsWith('\\\\')) return true
+      return (
+        /^\/(?:Users|tmp|private|Volumes|opt|Applications|var|etc|home|root)\//.test(text) ||
+        /^~[\\/]/.test(text)
+      )
     }
 
     /** Message suffix that hands file paths to CC instead of uploading bytes. */
@@ -3015,7 +3061,7 @@ window.__ModuleLoader__.load({
             merged.push({
               id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
               path,
-              name: String(path).split('/').pop() || path,
+              name: String(path).split(/[/\\]/).pop() || path,
             })
           }
           return merged
@@ -3078,11 +3124,7 @@ window.__ModuleLoader__.load({
         const fallbackPaths = fileUrisToPaths(data.getData('text/uri-list') || '')
         // Some shells expose a copied file only as its absolute path string.
         const plain = String(data.getData('text/plain') || '').trim()
-        if (
-          plain &&
-          !plain.includes('\n') &&
-          /^\/(?:Users|tmp|private|Volumes|opt|Applications|var|etc)\//.test(plain)
-        ) {
+        if (isLikelyPastedPath(plain)) {
           fallbackPaths.push(plain)
         }
         if (files.length > 0) {
@@ -3816,6 +3858,10 @@ window.__ModuleLoader__.load({
           .then((payload) => {
             setChatEnabled(payload?.chat !== false)
             setPlatformWarning(String(payload?.platformWarning ?? ''))
+            if (payload?.platform) {
+              HOST_PLATFORM = String(payload.platform)
+              setTick((value) => value + 1)
+            }
           })
           .catch(() => {})
       }, [])
@@ -4300,6 +4346,7 @@ window.__ModuleLoader__.load({
         SubagentDrawer,
         hostPathOf,
         fileUrisToPaths,
+        isLikelyPastedPath,
         attachmentBlock,
       },
       apply(ctx) {

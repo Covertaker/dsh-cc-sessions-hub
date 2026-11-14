@@ -10,10 +10,10 @@
  * has no file lock, and a second writer forks the conversation silently.
  */
 import { query } from '@anthropic-ai/claude-agent-sdk'
-import { accessSync, constants, statSync } from 'node:fs'
+import { accessSync, constants, readFileSync, statSync } from 'node:fs'
 import { stat } from 'node:fs/promises'
 import { homedir } from 'node:os'
-import { join } from 'node:path'
+import { delimiter, dirname, join } from 'node:path'
 import { historyFor } from './history.js'
 import { OWNED } from './owned.js'
 
@@ -25,17 +25,19 @@ const MAX_LIVE = 4
 const IDLE_DISPOSE_MS = 30 * 60 * 1000
 const MAX_INPUT_CHARS = 4_000
 
-/** CLI version this plugin was tested against (SDK 0.3.323 bundles 2.1.323). */
-export const TESTED_CC_VERSION = '2.1.323'
+/** CLI versions this plugin was tested against (SDK 0.3.323; macOS + Windows). */
+export const TESTED_CC_VERSIONS = new Set(['2.1.323', '2.1.325'])
 
 export function ccVersionWarning(version) {
   const value = String(version ?? '').trim().replace(/^v/i, '').split(/\s+/)[0]
-  if (!value || value === TESTED_CC_VERSION) return ''
-  return `Claude Code CLI ${value} 未在本插件验证（测试版 ${TESTED_CC_VERSION}，SDK 0.3.323）；如遇异常先回退 CLI`
+  if (!value || TESTED_CC_VERSIONS.has(value)) return ''
+  return `Claude Code CLI ${value} 未在本插件验证（测试版 ${[...TESTED_CC_VERSIONS].join(' / ')}，SDK 0.3.323）；如遇异常先回退 CLI`
 }
 
 /** @type {Map<string, Runtime>} */
 export const RUNTIMES = new Map()
+
+const WIN = process.platform === 'win32'
 
 function looksExecutable(path) {
   try {
@@ -46,20 +48,53 @@ function looksExecutable(path) {
   }
 }
 
+/**
+ * Windows PATH entries point at npm shims (`claude.cmd`), which
+ * child_process.spawn refuses to launch without a shell (Node throws EINVAL for
+ * .cmd/.bat). The shim only forwards to the native binary, so read it and hand
+ * back that binary; a bare .cmd is unusable as `pathToClaudeCodeExecutable`.
+ */
+function spawnable(path) {
+  if (!looksExecutable(path)) return undefined
+  if (!WIN || !/\.(?:cmd|bat)$/i.test(path)) return path
+  try {
+    const shim = readFileSync(path, 'utf8').replace(/%dp0%/gi, `${dirname(path)}\\`)
+    const match = shim.match(/"([^"\r\n]+\.exe)"/i) ?? shim.match(/([A-Za-z]:\\[^\s"\r\n]+\.exe)/i)
+    if (match && looksExecutable(match[1])) return match[1]
+  } catch {
+    /* unreadable shim: try the next candidate */
+  }
+  return undefined
+}
+
+const CLAUDE_NAMES = WIN ? ['claude.exe', 'claude.cmd', 'claude.bat', 'claude'] : ['claude']
+
 /** Resolve the installed CLI once; the SDK only speaks the protocol. */
 function resolveClaude() {
+  // Windows splits PATH on ';' — splitting on ':' would cut "C:\...".
+  const pathDirs = String(process.env.PATH ?? '')
+    .split(delimiter)
+    .filter(Boolean)
   const candidates = [
     process.env.CLAUDE_CODE_BIN,
-    '/opt/homebrew/bin/claude',
-    '/usr/local/bin/claude',
-    join(homedir(), '.claude', 'local', 'claude'),
-    ...String(process.env.PATH ?? '')
-      .split(':')
-      .filter(Boolean)
-      .map((dir) => join(dir, 'claude')),
+    ...(WIN
+      ? [
+          process.env.APPDATA
+            ? join(process.env.APPDATA, 'npm', 'node_modules', '@anthropic-ai', 'claude-code', 'bin', 'claude.exe')
+            : '',
+          join(homedir(), '.local', 'bin', 'claude.exe'),
+          join(homedir(), '.claude', 'local', 'claude.exe'),
+        ]
+      : [
+          '/opt/homebrew/bin/claude',
+          '/usr/local/bin/claude',
+          join(homedir(), '.claude', 'local', 'claude'),
+        ]),
+    ...pathDirs.flatMap((dir) => CLAUDE_NAMES.map((name) => join(dir, name))),
   ].filter(Boolean)
   for (const candidate of candidates) {
-    if (looksExecutable(candidate)) return candidate
+    const resolved = spawnable(candidate)
+    if (resolved) return resolved
   }
   return undefined
 }
@@ -70,7 +105,8 @@ export function expandHome(value) {
   const text = String(value ?? '').trim()
   if (!text) return ''
   if (text === '~') return homedir()
-  if (text.startsWith('~/')) return join(homedir(), text.slice(2))
+  // Windows users type `~\dir` as often as `~/dir`.
+  if (text.startsWith('~/') || text.startsWith('~\\')) return join(homedir(), text.slice(2))
   return text
 }
 
