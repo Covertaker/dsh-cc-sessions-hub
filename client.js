@@ -2660,8 +2660,6 @@ window.__ModuleLoader__.load({
       const [commands, setCommands] = React.useState([])
       const [showCommands, setShowCommands] = React.useState(false)
       const [showSettings, setShowSettings] = React.useState(false)
-      const [showPreviewPicker, setShowPreviewPicker] = React.useState(false)
-      const [previewPathInput, setPreviewPathInput] = React.useState('')
       const [subagents, setSubagents] = React.useState([])
       const [subPane, setSubPane] = React.useState(false)
       const [subSelected, setSubSelected] = React.useState(null)
@@ -2915,34 +2913,6 @@ window.__ModuleLoader__.load({
         } finally {
           setLoadingOlder(false)
         }
-      }
-
-      const lastFilePath = React.useMemo(() => {
-        const list = snap?.items ?? []
-        for (let index = list.length - 1; index >= 0; index -= 1) {
-          const input = list[index]?.input
-          const candidate = input?.file_path || input?.path || input?.notebook_path
-          if (typeof candidate === 'string' && candidate.startsWith('/')) return candidate
-        }
-        return ''
-      }, [snap?.items])
-
-      const openPreviewPath = () => {
-        const raw = previewPathInput.trim().replace(/^[\"'`]+|[\"'`]+$/g, '')
-        if (!raw) {
-          setNotice('先输入绝对路径，或点消息里工具卡的「预览」')
-          return
-        }
-        if (!raw.startsWith('/') && !raw.startsWith('~')) {
-          setNotice('需要绝对路径（以 / 或 ~ 开头）')
-          return
-        }
-        setPreview(raw)
-      }
-
-      const openPreviewPicker = () => {
-        setPreviewPathInput((prev) => prev || lastFilePath)
-        setShowPreviewPicker((value) => !value)
       }
 
       const closeSession = async () => {
@@ -3255,17 +3225,20 @@ window.__ModuleLoader__.load({
           {
             style: {
               padding: '14px 18px',
+              // On macOS the collapsed sidebar puts traffic lights + controls over
+              // the top-left corner; pad by the frame's published clearance.
+              paddingLeft: 'max(18px, var(--dsh-frame-leading-clearance, 18px))',
               borderBottom: `1px solid ${T.line}`,
               display: 'flex',
               alignItems: 'center',
-              gap: 10,
-              flexWrap: 'wrap',
+              gap: 8,
+              flexWrap: 'nowrap',
             },
           },
           h(GhostButton, { onClick: onBack }, '← 列表'),
           h(
             'div',
-            { style: { display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0, flex: '1 1 220px' } },
+            { style: { display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0, flex: '1 1 0' } },
             h(
               'span',
               { title, style: { fontSize: 14, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } },
@@ -3304,13 +3277,20 @@ window.__ModuleLoader__.load({
                 `子代理（${subagents.length}）`,
               )
             : null,
-          h(GhostButton, { onClick: openPreviewPicker }, '预览文件'),
-          h(GhostButton, { onClick: () => setShowSettings((value) => !value) }, showSettings ? '收起设置' : '设置'),
-          snap?.source === 'panel'
-            ? h(GhostButton, { onClick: closeSession, disabled: busy, title: '结束面板持有的进程；会话记录保留' }, '结束会话')
-            : null,
+          h(
+            GhostButton,
+            { onClick: () => setShowSettings((value) => !value) },
+            showSettings ? '收起设置' : '设置',
+          ),
           runningStatus ? h(GhostButton, { onClick: stop }, '停止') : null,
           readonly ? h(GhostButton, { onClick: fork, disabled: busy }, 'fork 到面板') : null,
+          snap?.source === 'panel'
+            ? h(
+                GhostButton,
+                { onClick: closeSession, disabled: busy, title: '结束面板持有的进程；会话记录保留' },
+                '结束会话',
+              )
+            : null,
         ),
         snap?.versionWarning
           ? h(
@@ -3432,40 +3412,6 @@ window.__ModuleLoader__.load({
                 h('span', { key: label, style: { color: T.caption } }, label),
                 h('span', { key: `${label}-v`, style: { wordBreak: 'break-all' } }, value),
               ]),
-            )
-          : null,
-        showPreviewPicker
-          ? h(
-              'div',
-              {
-                style: {
-                  padding: '6px 16px',
-                  borderBottom: `${HAIRLINE} solid ${T.line}`,
-                  display: 'flex',
-                  gap: 8,
-                  alignItems: 'center',
-                },
-              },
-              h('input', {
-                value: previewPathInput,
-                onChange: (event) => setPreviewPathInput(event.target.value),
-                onKeyDown: (event) => {
-                  if (event.key === 'Enter') openPreviewPath()
-                },
-                placeholder: '绝对路径，例如 /Users/you/Projects/x/README.md',
-                style: {
-                  flex: '1 1 auto',
-                  minWidth: 200,
-                  padding: '4px 8px',
-                  fontFamily: MONO,
-                  fontSize: 11,
-                  color: T.text,
-                  background: T.layer1,
-                  border: `${HAIRLINE} solid ${T.line}`,
-                  outline: 'none',
-                },
-              }),
-              h(GhostButton, { onClick: openPreviewPath }, '打开预览'),
             )
           : null,
         h(
@@ -4044,6 +3990,8 @@ window.__ModuleLoader__.load({
           {
             style: {
               padding: '18px 18px 14px',
+              // Entry pages start below the macOS titlebar (traffic lights + seat).
+              paddingTop: 'calc(18px + var(--dsh-frame-top-clearance, 0px))',
               borderBottom: `1px solid ${T.line}`,
               display: 'flex',
               flexDirection: 'column',

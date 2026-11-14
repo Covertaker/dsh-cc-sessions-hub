@@ -1,6 +1,6 @@
 # CC Sessions Hub
 
-Claude Code 会话工作台，跑在 **DeepSeek Harness（DSH）桌面端**里：在同一个界面中浏览本机 CC 会话、继续对话、审批工具调用、调用 skills、预览文件、查看子代理过程。
+Claude Code 会话工作台，跑在 **DeepSeek Harness（DSH）桌面端**里：在同一个界面中浏览本机 CC 会话、继续对话、审批工具调用、调用 skills、预览文件内容、查看子代理过程。
 
 > 非官方社区插件，与 DeepSeek、Anthropic 均无隶属关系。
 
@@ -54,7 +54,7 @@ dsh plugin --profile desktop add link:$PWD
 2. 点会话标题或「对话」进入对话；历史会话直接输入即 resume。
 3. 右上「设置」改权限模式 / effort / 思考显示；默认 auto + xhigh + 思考关。
 4. 终端里正在跑的会话显示**只读**，点「fork 到面板」才能继续（cc 无文件锁，避免双写分叉）。
-5. 「预览文件」可输入绝对路径直接打开；工具卡里的路径也可点「预览」。
+5. 点消息或工具卡里的路径即可预览；标题栏不再提供固定的预览入口。
 6. 会话行或对话标题栏点「子代理（N）」看整个会话的子代理；Task/Agent 卡上可直接展开单条。
 
 ## 配置
