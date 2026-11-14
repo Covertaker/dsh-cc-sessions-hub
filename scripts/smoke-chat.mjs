@@ -53,7 +53,7 @@ await writeFile(join(dir, 't', 'subagents', 'agent-a.meta.json'), '{}')
 await writeFile(join(dir, 't', 'subagents', 'agent-a.jsonl'), '')
 check('子代理计数：列表徽标', (await countSubagents(transcript)) === 1, '1 meta')
 check('子代理计数：无目录返回 0', (await countSubagents(join(dir, 'none.jsonl'))) === 0)
-check('CLI 版本警示：测试版不提示', ccVersionWarning('2.1.323') === '')
+check('CLI 版本警示：测试版不提示', ccVersionWarning('2.1.325') === '')
 check('CLI 版本警示：异常版本提示', ccVersionWarning('2.1.400').includes('未在本插件验证'))
 
 /* 2. file preview */
@@ -162,7 +162,7 @@ check('路由：跨站取 token 403', crossToken.status === 403)
     subtype: 'init',
     model: 'm',
     cwd: dir,
-    claude_code_version: '2.1.323',
+    claude_code_version: '2.1.325',
     permissionMode: 'auto',
     tools: [],
     skills: ['demo-skill'],

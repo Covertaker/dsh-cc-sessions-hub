@@ -25,8 +25,8 @@ const MAX_LIVE = 4
 const IDLE_DISPOSE_MS = 30 * 60 * 1000
 const MAX_INPUT_CHARS = 4_000
 
-/** CLI version this plugin was tested against (SDK 0.3.323 bundles 2.1.323). */
-export const TESTED_CC_VERSION = '2.1.323'
+/** CLI version this plugin was tested against (SDK 0.3.323; CLI verified on macOS and Windows). */
+export const TESTED_CC_VERSION = '2.1.325'
 
 export function ccVersionWarning(version) {
   const value = String(version ?? '').trim().replace(/^v/i, '').split(/\s+/)[0]

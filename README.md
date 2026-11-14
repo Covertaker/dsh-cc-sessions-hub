@@ -22,14 +22,14 @@ Claude Code 会话工作台，跑在 **DeepSeek Harness（DSH）桌面端**里�
 
 | 依赖 | 说明 |
 |---|---|
-| **DSH 桌面端** | 在 `0.2.2-rc.2` 上测试（开发期亦覆盖 rc.1）；插件使用其客户端私有服务（layout / sidebar / slots 等），**DSH 升级可能失效** |
-| **Claude Code CLI** | 已在本机 `2.1.323` 上测试；需要已登录，`claude` 在 PATH 或 `CLAUDE_CODE_BIN` |
+| **DSH 桌面端** | 在 `0.2.2-rc.2` 上测试（开发期亦覆盖 rc.1）；**Windows 于 `0.2.2-rc.3` 复验**。插件使用其客户端私有服务（layout / sidebar / slots 等），**DSH 升级可能失效** |
+| **Claude Code CLI** | 已在 `2.1.325`（Windows）/ `2.1.323`（macOS）上测试；需要已登录，`claude` 在 PATH 或 `CLAUDE_CODE_BIN` |
 | **Agent SDK** | 钉在 `@anthropic-ai/claude-agent-sdk@0.3.323`（内置 CLI 2.1.323） |
 | **Node.js** | ≥ 22（插件与 SDK 运行在 DSH 主进程） |
 | **系统** | macOS 与 Windows 均已实现；Linux 未验证。文件「打开 / 定位」按平台分派（Finder / 资源管理器） |
 | **LibreOffice**（可选） | Word/ODT 预览需要；**Windows 上缺省回落到 DSH 桌面端自带的 `@deepseek-ai/libreoffice-kit`**（免装 LibreOffice），两者都没有时提示"用系统应用打开" |
 
-> CLI 版本与测试版（`2.1.323`）不一致时，对话页顶部会显示黄条提示；不阻断使用。
+> CLI 版本与测试版（`2.1.325`）不一致时，对话页顶部会显示黄条提示；不阻断使用。
 
 ## 安装
 
