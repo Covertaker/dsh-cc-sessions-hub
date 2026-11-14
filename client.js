@@ -2585,6 +2585,39 @@ window.__ModuleLoader__.load({
       )
     }
 
+    /** Absolute host path of a picked/dropped/pasted File in the DSH desktop shell. */
+    function hostPathOf(file) {
+      try {
+        const bridge = globalThis.__DSH_HOST_PATHS__
+        return typeof bridge?.pathFor === 'function' ? String(bridge.pathFor(file) ?? '') : ''
+      } catch {
+        return ''
+      }
+    }
+
+    /** file:// URLs from a paste (text/uri-list) → decoded absolute paths. */
+    function fileUrisToPaths(text) {
+      const out = []
+      for (const line of String(text ?? '').split(/\r?\n/)) {
+        const value = line.trim()
+        if (!value || value.startsWith('#')) continue
+        try {
+          const url = new URL(value)
+          if (url.protocol === 'file:' && url.pathname) out.push(decodeURIComponent(url.pathname))
+        } catch {
+          /* not a URL */
+        }
+      }
+      return out
+    }
+
+    /** Message suffix that hands file paths to CC instead of uploading bytes. */
+    function attachmentBlock(list) {
+      if (!Array.isArray(list) || list.length === 0) return ''
+      const lines = list.map((item) => `- \`${String(item.path).replace(/[`\r\n]/g, '')}\``)
+      return `\n\n附件（请先读取）：\n${lines.join('\n')}`
+    }
+
     function ChatView({ target, onBack }) {
       const [sid, setSid] = React.useState(target.id)
       const [snap, setSnap] = React.useState(null)
@@ -2609,6 +2642,7 @@ window.__ModuleLoader__.load({
       const [loadingOlder, setLoadingOlder] = React.useState(false)
       const [thinking, setThinking] = React.useState(false)
       const [images, setImages] = React.useState([])
+      const [attachments, setAttachments] = React.useState([])
       const [streamEpoch, setStreamEpoch] = React.useState(0)
       const listRef = React.useRef(null)
       const fileRef = React.useRef(null)
@@ -2780,8 +2814,10 @@ window.__ModuleLoader__.load({
 
       const send = async () => {
         const body = text.trim()
-        const attachments = images
-        if ((!body && attachments.length === 0) || busy) return
+        const inlineImages = images
+        const pathAttachments = attachments
+        const outgoing = `${body}${attachmentBlock(pathAttachments)}`.trim()
+        if ((!outgoing && inlineImages.length === 0) || busy) return
         if (!cwd && draft) {
           setError('先选一个工作目录')
           return
@@ -2791,9 +2827,9 @@ window.__ModuleLoader__.load({
         setNotice('')
         const optimisticKey = `local-${Date.now()}`
         const optimistic = []
-        if (body) optimistic.push({ key: optimisticKey, role: 'user', kind: 'text', text: body })
-        if (attachments.length > 0) {
-          optimistic.push({ key: `${optimisticKey}-img`, role: 'user', kind: 'image', count: attachments.length })
+        if (outgoing) optimistic.push({ key: optimisticKey, role: 'user', kind: 'text', text: outgoing })
+        if (inlineImages.length > 0) {
+          optimistic.push({ key: `${optimisticKey}-img`, role: 'user', kind: 'image', count: inlineImages.length })
         }
         setSnap((prev) =>
           prev
@@ -2802,13 +2838,14 @@ window.__ModuleLoader__.load({
         )
         setText('')
         setImages([])
+        setAttachments([])
         stickRef.current = true
         try {
           const payload = await postJson(`${CHAT}/send`, {
             id: sid,
-            text: body,
+            text: outgoing,
             cwd: cwd || undefined,
-            images: attachments.map((image) => ({ media_type: image.media_type, data: image.data })),
+            images: inlineImages.map((image) => ({ media_type: image.media_type, data: image.data })),
           })
           setSnap(payload)
           lastItemsTotal.current = payload.itemsTotal ?? -1
@@ -2817,7 +2854,8 @@ window.__ModuleLoader__.load({
         } catch (cause) {
           setError(String(cause?.message ?? cause))
           setText(body)
-          setImages(attachments)
+          setImages(inlineImages)
+          setAttachments(pathAttachments)
           setSnap((prev) =>
             prev
               ? { ...prev, items: (prev.items || []).filter((item) => item.key !== optimisticKey && item.key !== `${optimisticKey}-img`) }
@@ -2915,34 +2953,133 @@ window.__ModuleLoader__.load({
         }
       }
 
-      const addFiles = (fileList) => {
-        const files = [...fileList].filter((file) => String(file.type).startsWith('image/'))
-        for (const file of files.slice(0, 4 - images.length)) {
-          if (file.size > 5 * 1024 * 1024) {
-            setError('单张图片上限 5MB')
+      /** Screenshots (no source path) are the only attachments kept inline. */
+      const addInlineImage = (file) => {
+        if (file.size > 5 * 1024 * 1024) {
+          setError('单张图片上限 5MB')
+          return
+        }
+        const reader = new FileReader()
+        reader.onload = () => {
+          const dataUrl = String(reader.result ?? '')
+          const comma = dataUrl.indexOf(',')
+          if (comma < 0) return
+          setImages((prev) =>
+            prev.length >= 4
+              ? prev
+              : [
+                  ...prev,
+                  {
+                    id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+                    media_type: file.type || 'image/png',
+                    data: dataUrl.slice(comma + 1),
+                    name: file.name || '截图',
+                  },
+                ],
+          )
+        }
+        reader.readAsDataURL(file)
+      }
+
+      const addPaths = (paths) => {
+        setAttachments((prev) => {
+          const merged = [...prev]
+          for (const path of paths) {
+            if (!path || merged.some((item) => item.path === path)) continue
+            if (merged.length >= 20) break
+            merged.push({
+              id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+              path,
+              name: String(path).split('/').pop() || path,
+            })
+          }
+          return merged
+        })
+      }
+
+      /** Files that exist on disk become paths; only path-less images stay inline. */
+      const addFiles = (fileList, fallbackPaths = []) => {
+        const files = Array.from(fileList ?? []).filter(Boolean)
+        if (files.length === 0 && fallbackPaths.length === 0) return
+        const bridge = globalThis.__DSH_HOST_PATHS__
+        const hasBridge = typeof bridge?.pathFor === 'function'
+        const paths = [...fallbackPaths]
+        let unresolved = 0
+        let unresolvedName = ''
+        for (const file of files) {
+          const path = hostPathOf(file)
+          if (path) {
+            paths.push(path)
             continue
           }
-          const reader = new FileReader()
-          reader.onload = () => {
-            const dataUrl = String(reader.result ?? '')
-            const comma = dataUrl.indexOf(',')
-            if (comma < 0) return
-            setImages((prev) =>
-              prev.length >= 4
-                ? prev
-                : [
-                    ...prev,
-                    {
-                      id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
-                      media_type: file.type,
-                      data: dataUrl.slice(comma + 1),
-                      name: file.name,
-                    },
-                  ],
-            )
+          if (String(file.type || '').startsWith('image/')) {
+            addInlineImage(file)
+            continue
           }
-          reader.readAsDataURL(file)
+          unresolved += 1
+          if (!unresolvedName) unresolvedName = file.name || '未命名文件'
         }
+        if (unresolved > 0 && fallbackPaths.length === 0) {
+          setError(
+            hasBridge
+              ? `取不到文件路径：${unresolvedName}`
+              : '文件路径仅桌面端支持；截图可直接粘贴为内联图片',
+          )
+        }
+        if (paths.length > 0) addPaths(paths)
+      }
+
+      const onPaste = (event) => {
+        const data = event.clipboardData
+        if (!data) return
+        // Clipboard exposes the same file through both items and files; keep one,
+        // preferring a copy that resolves to a host path.
+        const byKey = new Map()
+        const push = (file) => {
+          if (!file) return
+          const key = `${file.name || ''}|${file.size}|${file.type || ''}`
+          const existing = byKey.get(key)
+          if (!existing) {
+            byKey.set(key, file)
+            return
+          }
+          if (!hostPathOf(existing) && hostPathOf(file)) byKey.set(key, file)
+        }
+        for (const item of Array.from(data.items ?? [])) {
+          if (item.kind === 'file') push(item.getAsFile())
+        }
+        for (const file of Array.from(data.files ?? [])) push(file)
+        const files = [...byKey.values()]
+        const fallbackPaths = fileUrisToPaths(data.getData('text/uri-list') || '')
+        // Some shells expose a copied file only as its absolute path string.
+        const plain = String(data.getData('text/plain') || '').trim()
+        if (
+          plain &&
+          !plain.includes('\n') &&
+          /^\/(?:Users|tmp|private|Volumes|opt|Applications|var|etc)\//.test(plain)
+        ) {
+          fallbackPaths.push(plain)
+        }
+        if (files.length > 0) {
+          event.preventDefault()
+          addFiles(files, fallbackPaths)
+          return
+        }
+        if (fallbackPaths.length > 0) {
+          event.preventDefault()
+          addPaths(fallbackPaths)
+        }
+      }
+
+      const onDrop = (event) => {
+        const files = Array.from(event.dataTransfer?.files ?? [])
+        if (files.length === 0) return
+        event.preventDefault()
+        addFiles(files)
+      }
+
+      const onDragOver = (event) => {
+        if (Array.from(event.dataTransfer?.types ?? []).includes('Files')) event.preventDefault()
       }
 
       const stop = async () => {
@@ -3422,6 +3559,64 @@ window.__ModuleLoader__.load({
                 : h(
                     'div',
                     { style: { display: 'flex', flexDirection: 'column', gap: 6 } },
+                    attachments.length > 0
+                      ? h(
+                          'div',
+                          { style: { display: 'flex', gap: 6, flexWrap: 'wrap' } },
+                          attachments.map((item) =>
+                            h(
+                              'div',
+                              {
+                                key: item.id,
+                                title: item.path,
+                                style: {
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: 6,
+                                  maxWidth: 280,
+                                  padding: '4px 6px 4px 9px',
+                                  border: `1px solid ${T.line}`,
+                                  borderRadius: 8,
+                                  background: T.layer1,
+                                  fontSize: 11,
+                                  color: T.sub,
+                                },
+                              },
+                              h(
+                                'span',
+                                {
+                                  style: {
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    whiteSpace: 'nowrap',
+                                  },
+                                },
+                                item.name,
+                              ),
+                              h(
+                                'button',
+                                {
+                                  type: 'button',
+                                  onClick: () =>
+                                    setAttachments((prev) => prev.filter((entry) => entry.id !== item.id)),
+                                  title: '移除',
+                                  style: {
+                                    appearance: 'none',
+                                    border: 'none',
+                                    background: 'transparent',
+                                    color: T.caption,
+                                    cursor: 'pointer',
+                                    padding: 0,
+                                    fontSize: 12,
+                                    lineHeight: 1,
+                                  },
+                                },
+                                '×',
+                              ),
+                            ),
+                          ),
+                        )
+                      : null,
                     images.length > 0
                       ? h(
                           'div',
@@ -3468,15 +3663,9 @@ window.__ModuleLoader__.load({
                     h('textarea', {
                       value: text,
                       onChange: (event) => setText(event.target.value),
-                      onPaste: (event) => {
-                        const files = [...(event.clipboardData?.items ?? [])]
-                          .map((item) => (item.kind === 'file' ? item.getAsFile() : null))
-                          .filter(Boolean)
-                        if (files.length > 0) {
-                          event.preventDefault()
-                          addFiles(files)
-                        }
-                      },
+                      onPaste,
+                      onDrop,
+                      onDragOver,
                       onKeyDown: (event) => {
                         if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent?.isComposing) {
                           event.preventDefault()
@@ -3484,7 +3673,7 @@ window.__ModuleLoader__.load({
                         }
                       },
                       rows: 3,
-                      placeholder: '给 CC 发消息…（Enter 发送，Shift+Enter 换行）',
+                      placeholder: '给 CC 发消息…（Enter 发送；可拖入或粘贴文件，截图直接粘）',
                       className: 'ccs-focus',
                       style: {
                         flex: '1 1 auto',
@@ -3508,12 +3697,27 @@ window.__ModuleLoader__.load({
                     h(
                       'div',
                       { style: { display: 'flex', flexDirection: 'column', gap: 6 } },
-                      h(PrimaryButton, { onClick: send, disabled: busy || (!text.trim() && images.length === 0) }, busy ? '…' : '发送'),
-                      h(GhostButton, { onClick: () => fileRef.current?.click() }, '图片'),
+                      h(
+                        PrimaryButton,
+                        {
+                          onClick: send,
+                          disabled:
+                            busy ||
+                            (!text.trim() && images.length === 0 && attachments.length === 0),
+                        },
+                        busy ? '…' : '发送',
+                      ),
+                      h(
+                        GhostButton,
+                        {
+                          onClick: () => fileRef.current?.click(),
+                          title: '选择任意文件；桌面端把绝对路径交给 CC（截图可直接粘贴）',
+                        },
+                        '文件',
+                      ),
                       h('input', {
                         ref: fileRef,
                         type: 'file',
-                        accept: 'image/*',
                         multiple: true,
                         style: { display: 'none' },
                         onChange: (event) => {
@@ -4048,7 +4252,18 @@ window.__ModuleLoader__.load({
 
     return {
       inject: ['slots'],
-      __test: { SessionsPanel, Row, ChatView, MessageList, QuestionCard, ToolCard, SubagentDrawer },
+      __test: {
+        SessionsPanel,
+        Row,
+        ChatView,
+        MessageList,
+        QuestionCard,
+        ToolCard,
+        SubagentDrawer,
+        hostPathOf,
+        fileUrisToPaths,
+        attachmentBlock,
+      },
       apply(ctx) {
         ROOT = ctx
         ctx.slots.inject('main', () => ctx.slots.register({ name: 'main', key: PANEL_ID }, SessionsPanel))
