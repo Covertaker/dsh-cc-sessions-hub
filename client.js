@@ -2618,6 +2618,35 @@ window.__ModuleLoader__.load({
       return `\n\n附件（请先读取）：\n${lines.join('\n')}`
     }
 
+    /** Inline screenshots are re-encoded so a Retina paste stays under the body cap. */
+    const INLINE_IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/gif', 'image/webp'])
+    const INLINE_IMAGE_EDGE = 1568
+    const INLINE_IMAGE_QUALITY = 0.85
+
+    async function compressInlineImage(file) {
+      if (typeof createImageBitmap !== 'function') return file
+      const bitmap = await createImageBitmap(file)
+      try {
+        const scale = Math.min(1, INLINE_IMAGE_EDGE / Math.max(bitmap.width, bitmap.height))
+        const width = Math.max(1, Math.round(bitmap.width * scale))
+        const height = Math.max(1, Math.round(bitmap.height * scale))
+        const canvas = document.createElement('canvas')
+        canvas.width = width
+        canvas.height = height
+        const context = canvas.getContext('2d')
+        if (!context) return file
+        context.drawImage(bitmap, 0, 0, width, height)
+        const blob = await new Promise((resolve) =>
+          canvas.toBlob(resolve, 'image/jpeg', INLINE_IMAGE_QUALITY),
+        )
+        if (!blob) return file
+        // Re-encoding a small PNG can grow it; keep whichever is smaller.
+        return blob.size < file.size ? blob : file
+      } finally {
+        bitmap.close?.()
+      }
+    }
+
     function ChatView({ target, onBack }) {
       const [sid, setSid] = React.useState(target.id)
       const [snap, setSnap] = React.useState(null)
@@ -2643,6 +2672,7 @@ window.__ModuleLoader__.load({
       const [thinking, setThinking] = React.useState(false)
       const [images, setImages] = React.useState([])
       const [attachments, setAttachments] = React.useState([])
+      const [processingImages, setProcessingImages] = React.useState(0)
       const [streamEpoch, setStreamEpoch] = React.useState(0)
       const listRef = React.useRef(null)
       const fileRef = React.useRef(null)
@@ -2954,31 +2984,56 @@ window.__ModuleLoader__.load({
       }
 
       /** Screenshots (no source path) are the only attachments kept inline. */
-      const addInlineImage = (file) => {
-        if (file.size > 5 * 1024 * 1024) {
-          setError('单张图片上限 5MB')
+      const addInlineImage = async (file) => {
+        const type = String(file.type || '')
+        if (type && !INLINE_IMAGE_TYPES.has(type)) {
+          setError(`不支持的图片类型：${type}`)
           return
         }
-        const reader = new FileReader()
-        reader.onload = () => {
-          const dataUrl = String(reader.result ?? '')
-          const comma = dataUrl.indexOf(',')
-          if (comma < 0) return
-          setImages((prev) =>
-            prev.length >= 4
-              ? prev
-              : [
-                  ...prev,
-                  {
-                    id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
-                    media_type: file.type || 'image/png',
-                    data: dataUrl.slice(comma + 1),
-                    name: file.name || '截图',
-                  },
-                ],
-          )
+        if (file.size > 20 * 1024 * 1024) {
+          setError('截图超过 20MB，未处理')
+          return
         }
-        reader.readAsDataURL(file)
+        setProcessingImages((count) => count + 1)
+        try {
+          const blob = await compressInlineImage(file)
+          if (blob.size > 1.5 * 1024 * 1024) {
+            setError('截图压缩后仍超过 1.5MB，请缩小后重试')
+            return
+          }
+          await new Promise((resolve) => {
+            const reader = new FileReader()
+            reader.onload = () => {
+              const dataUrl = String(reader.result ?? '')
+              const comma = dataUrl.indexOf(',')
+              if (comma >= 0) {
+                setImages((prev) =>
+                  prev.length >= 4
+                    ? prev
+                    : [
+                        ...prev,
+                        {
+                          id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+                          media_type: blob.type || 'image/jpeg',
+                          data: dataUrl.slice(comma + 1),
+                          name: file.name || '截图',
+                        },
+                      ],
+                )
+              }
+              resolve()
+            }
+            reader.onerror = () => {
+              setError('截图读取失败')
+              resolve()
+            }
+            reader.readAsDataURL(blob)
+          })
+        } catch (cause) {
+          setError(`截图处理失败：${String(cause?.message ?? cause)}`)
+        } finally {
+          setProcessingImages((count) => Math.max(0, count - 1))
+        }
       }
 
       const addPaths = (paths) => {
@@ -3257,6 +3312,21 @@ window.__ModuleLoader__.load({
           runningStatus ? h(GhostButton, { onClick: stop }, '停止') : null,
           readonly ? h(GhostButton, { onClick: fork, disabled: busy }, 'fork 到面板') : null,
         ),
+        snap?.versionWarning
+          ? h(
+              'div',
+              {
+                style: {
+                  padding: '6px 16px',
+                  fontSize: 11.5,
+                  color: T.warn,
+                  background: T.layer1,
+                  borderBottom: `${HAIRLINE} solid ${T.line}`,
+                },
+              },
+              snap.versionWarning,
+            )
+          : null,
         showSettings
           ? h(
               'div',
@@ -3703,9 +3773,10 @@ window.__ModuleLoader__.load({
                           onClick: send,
                           disabled:
                             busy ||
+                            processingImages > 0 ||
                             (!text.trim() && images.length === 0 && attachments.length === 0),
                         },
-                        busy ? '…' : '发送',
+                        busy ? '…' : processingImages > 0 ? '处理中' : '发送',
                       ),
                       h(
                         GhostButton,
@@ -3770,6 +3841,7 @@ window.__ModuleLoader__.load({
       const [chat, setChat] = React.useState(null)
       const [subView, setSubView] = React.useState(null)
       const [chatEnabled, setChatEnabled] = React.useState(true)
+      const [platformWarning, setPlatformWarning] = React.useState('')
       const [limit, setLimit] = React.useState(200)
 
       const load = React.useCallback(() => {
@@ -3795,7 +3867,10 @@ window.__ModuleLoader__.load({
       // Chat is a host-side opt-out; the UI follows whatever the host reports.
       React.useEffect(() => {
         getJson('/_ccpanel/diag')
-          .then((payload) => setChatEnabled(payload?.chat !== false))
+          .then((payload) => {
+            setChatEnabled(payload?.chat !== false)
+            setPlatformWarning(String(payload?.platformWarning ?? ''))
+          })
           .catch(() => {})
       }, [])
 
@@ -3949,6 +4024,21 @@ window.__ModuleLoader__.load({
           },
         },
         h(PanelStyle, null),
+        platformWarning
+          ? h(
+              'div',
+              {
+                style: {
+                  padding: '7px 16px',
+                  fontSize: 11.5,
+                  color: T.warn,
+                  background: T.layer1,
+                  borderBottom: `${HAIRLINE} solid ${T.line}`,
+                },
+              },
+              platformWarning,
+            )
+          : null,
         h(
           'div',
           {

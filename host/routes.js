@@ -29,7 +29,8 @@ import { TOKEN } from './token.js'
 
 const PROJECTS_DIR = join(homedir(), '.claude', 'projects')
 const SESSIONS_DIR = join(homedir(), '.claude', 'sessions')
-const MAX_BODY = 1 * 1024 * 1024
+const MAX_BODY = 8 * 1024 * 1024
+const MAX_BODY_MB = MAX_BODY / 1024 / 1024
 const LOOPBACK = /^(127\.0\.0\.1|localhost|\[::1\])(:\d+)?$/
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -83,7 +84,7 @@ async function readBody(request) {
     total += chunk.length
     if (total > 16 * 1024 * 1024) {
       request.destroy()
-      throw new HttpError(413, '请求体超过 1MB')
+      throw new HttpError(413, `请求体超过 ${MAX_BODY_MB}MB`)
     }
     if (tooLarge) continue
     if (total > MAX_BODY) {
@@ -93,7 +94,7 @@ async function readBody(request) {
     }
     chunks.push(chunk)
   }
-  if (tooLarge) throw new HttpError(413, '请求体超过 1MB')
+  if (tooLarge) throw new HttpError(413, `请求体超过 ${MAX_BODY_MB}MB`)
   const text = Buffer.concat(chunks).toString('utf8')
   if (!text.trim()) return {}
   let parsed

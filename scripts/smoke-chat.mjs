@@ -10,7 +10,7 @@ import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { countSubagents, fullTool, historyFor, parseTranscript } from '../host/history.js'
 import { pdfFile, previewFile } from '../host/files.js'
-import { RUNTIMES, runtimeFor } from '../host/engine.js'
+import { RUNTIMES, ccVersionWarning, runtimeFor } from '../host/engine.js'
 import { registerChatRoutes } from '../host/routes.js'
 import { TOKEN } from '../host/token.js'
 
@@ -53,6 +53,8 @@ await writeFile(join(dir, 't', 'subagents', 'agent-a.meta.json'), '{}')
 await writeFile(join(dir, 't', 'subagents', 'agent-a.jsonl'), '')
 check('子代理计数：列表徽标', (await countSubagents(transcript)) === 1, '1 meta')
 check('子代理计数：无目录返回 0', (await countSubagents(join(dir, 'none.jsonl'))) === 0)
+check('CLI 版本警示：测试版不提示', ccVersionWarning('2.1.323') === '')
+check('CLI 版本警示：异常版本提示', ccVersionWarning('2.1.400').includes('未在本插件验证'))
 
 /* 2. file preview */
 const sample = join(dir, 'a.txt')
@@ -144,14 +146,44 @@ check('路由：缺 token 401', noToken.status === 401)
 const tokenRoute = await call(chat, request({ url: '/_ccpanel/chat/token', headers: { 'x-cc-hub-token': '' } }))
 check('路由：token 可取', tokenRoute.status === 200 && tokenRoute.json?.token === TOKEN)
 const crossToken = await call(chat, request({ url: '/_ccpanel/chat/token', headers: { 'x-cc-hub-token': '', 'sec-fetch-site': 'cross-site' } }))
+const hugeBody = await call(
+  chat,
+  request({ method: 'POST', url: '/_ccpanel/chat/send', body: { id: 'x', text: 'a'.repeat(9 * 1024 * 1024) } }),
+)
+check('路由：请求体 8MB 上限', hugeBody.status === 413, String(hugeBody.status))
 check('路由：跨站取 token 403', crossToken.status === 403)
 
-const commands = await call(chat, request({ url: '/_ccpanel/chat/commands' }))
-check(
-  '路由：命令清单可用',
-  commands.status === 200 && Array.isArray(commands.json?.commands) && commands.json.commands.length > 0,
-  `${commands.json?.commands?.length ?? 0} 条`,
-)
+{
+  // Use a synthetic init so the command list does not depend on ~/.claude.
+  const id = randomUUID()
+  const commandRuntime = runtimeFor(id, { id, cwd: dir })
+  commandRuntime.handle({
+    type: 'system',
+    subtype: 'init',
+    model: 'm',
+    cwd: dir,
+    claude_code_version: '2.1.323',
+    permissionMode: 'auto',
+    tools: [],
+    skills: ['demo-skill'],
+    slash_commands: ['/help', '/clear'],
+    terminal_slash_commands: ['/clear'],
+    mcp_servers: [],
+    plugins: [],
+    agents: [],
+    output_style: 'default',
+  })
+  const commands = await call(chat, request({ url: `/_ccpanel/chat/commands?id=${id}` }))
+  check(
+    '路由：命令清单可用',
+    commands.status === 200 &&
+      commands.json?.source === 'runtime' &&
+      commands.json.commands.includes('/help') &&
+      !commands.json.commands.includes('/clear'),
+    `${commands.json?.commands?.join(',') ?? ''}`,
+  )
+  await commandRuntime.dispose()
+}
 
 const draftId = randomUUID()
 const options = await call(

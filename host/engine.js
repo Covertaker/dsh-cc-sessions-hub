@@ -25,6 +25,15 @@ const MAX_LIVE = 4
 const IDLE_DISPOSE_MS = 30 * 60 * 1000
 const MAX_INPUT_CHARS = 4_000
 
+/** CLI version this plugin was tested against (SDK 0.3.323 bundles 2.1.323). */
+export const TESTED_CC_VERSION = '2.1.323'
+
+export function ccVersionWarning(version) {
+  const value = String(version ?? '').trim().replace(/^v/i, '').split(/\s+/)[0]
+  if (!value || value === TESTED_CC_VERSION) return ''
+  return `Claude Code CLI ${value} 未在本插件验证（测试版 ${TESTED_CC_VERSION}，SDK 0.3.323）；如遇异常先回退 CLI`
+}
+
 /** @type {Map<string, Runtime>} */
 export const RUNTIMES = new Map()
 
@@ -264,6 +273,7 @@ export class Runtime {
     const type = message?.type
     if (type === 'system') {
       if (message.subtype === 'init') {
+        this.versionWarning = ccVersionWarning(message.claude_code_version)
         this.init = {
           model: message.model,
           cwd: message.cwd,
@@ -661,6 +671,7 @@ export class Runtime {
       status: this.status,
       model: this.init?.model ?? this.model ?? null,
       ccVersion: this.init?.claudeCodeVersion ?? null,
+      versionWarning: this.versionWarning ?? '',
       permissionMode: this.init?.permissionMode ?? null,
       mode: this.mode,
       effort: this.effort,

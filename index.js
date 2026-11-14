@@ -20,9 +20,13 @@ import { join } from 'node:path'
 import { execFile } from 'node:child_process'
 import { OWNED } from './host/owned.js'
 import { countSubagents } from './host/history.js'
-import { TOKEN } from './host/token.js'
 
 const CLAUDE_DIR = join(homedir(), '.claude')
+const PLATFORM = process.platform
+const PLATFORM_WARNING =
+  PLATFORM === 'darwin'
+    ? ''
+    : `当前平台 ${PLATFORM} 未验证：文件打开、Finder 与部分路径逻辑依赖 macOS`
 const PROJECTS_DIR = join(CLAUDE_DIR, 'projects')
 const SESSIONS_DIR = join(CLAUDE_DIR, 'sessions')
 const JOBS_DIR = join(CLAUDE_DIR, 'jobs')
@@ -598,10 +602,13 @@ function registerTools(ctx) {
     async execute(args, exec) {
       const row = await transcriptOf(args?.id)
       if (!row) throw new Error(`no transcript found for session ${args?.id}`)
+      const prompt = String(args?.prompt ?? '')
+      if (!prompt.trim()) throw new Error('prompt must not be empty')
+      if (prompt.trim().startsWith('-')) throw new Error('prompt must not start with "-"')
       const cwd = args?.cwd || row.cwd || homedir()
       const result = await run(
         'claude',
-        ['-p', '--resume', row.id, '--fork-session', '--output-format', 'json', String(args.prompt)],
+        ['-p', '--resume', row.id, '--fork-session', '--output-format', 'json', prompt],
         { cwd, timeout: 600_000 },
       )
       if (!result.ok) throw new Error(`claude fork failed: ${result.stderr || result.error}`)
@@ -655,9 +662,12 @@ function registerTools(ctx) {
     },
     async execute(args, exec) {
       const cwd = args?.cwd || exec?.cwd || process.cwd()
+      const prompt = String(args?.prompt ?? '')
+      if (!prompt.trim()) throw new Error('prompt must not be empty')
+      if (prompt.trim().startsWith('-')) throw new Error('prompt must not start with "-"')
       const argv = ['--bg']
       if (args?.name) argv.push('--name', String(args.name))
-      argv.push(String(args.prompt))
+      argv.push(prompt)
       const result = await run('claude', argv, { cwd, timeout: 120_000 })
       const text = `${result.stdout}\n${result.stderr}`.trim()
       if (!result.ok) throw new Error(`claude --bg failed: ${text || result.error}`)
@@ -770,6 +780,7 @@ function registerTools(ctx) {
 /* ── plugin entry ───────────────────────────────────────────────────── */
 
 export function apply(ctx) {
+  if (PLATFORM_WARNING) ctx.logger?.warn?.(`cc-sessions-panel: ${PLATFORM_WARNING}`)
   ctx.effect(
     () =>
       ctx.webServer.register({
@@ -829,40 +840,9 @@ export function apply(ctx) {
               return Response.json({ parts, text })
             }
             if (path === '/_ccpanel/fork') {
-              if (String(request.headers.get('x-cc-hub-token') ?? '') !== TOKEN) {
-                return Response.json({ error: 'missing or invalid x-cc-hub-token' }, { status: 401 })
-              }
-              const id = url.searchParams.get('id') ?? ''
-              const ask = url.searchParams.get('ask') ?? ''
-              if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
-                return Response.json({ error: 'id must be a full session UUID' }, { status: 400 })
-              }
-              if (!ask.trim()) return Response.json({ error: 'ask is required' }, { status: 400 })
-              if (ask.trim().startsWith('-')) {
-                return Response.json({ error: 'ask must not start with "-"' }, { status: 400 })
-              }
-              const row = await transcriptOf(id)
-              if (!row) return Response.json({ error: `no transcript for ${id}` }, { status: 404 })
-              const result = await run(
-                'claude',
-                ['-p', '--resume', row.id, '--fork-session', '--output-format', 'json', ask.trim()],
-                { cwd: row.cwd || homedir(), timeout: 900_000 },
-              )
-              if (!result.ok) {
-                return Response.json({ error: (result.stderr || result.error || 'fork failed').slice(0, 2000) }, { status: 502 })
-              }
-              let parsed
-              try {
-                parsed = JSON.parse(result.stdout)
-              } catch {
-                return Response.json({ error: `unparseable output: ${result.stdout.slice(0, 400)}` }, { status: 502 })
-              }
-              return Response.json({
-                sourceId: row.id,
-                sessionId: String(parsed.session_id ?? ''),
-                answer: String(parsed.result ?? ''),
-                costUsd: Number(parsed.total_cost_usd ?? 0),
-              })
+              // GET with a model call is unsafe (prefetch/replay); the panel uses
+              // POST /_ccpanel/chat/fork instead.
+              return Response.json({ error: 'GET fork removed; use POST /_ccpanel/chat/fork' }, { status: 410 })
             }
             if (path === '/_ccpanel/diag') {
               const tools = ctx.get('tools') ?? ctx.tools
@@ -872,6 +852,8 @@ export function apply(ctx) {
                 directoryPicker: picker?.capability?.()?.kind ?? 'absent',
                 chat: CHAT_ENABLED,
                 chatError: CHAT_STATUS.error,
+                platform: PLATFORM,
+                platformWarning: PLATFORM_WARNING,
                 injectDeclared: inject,
                 attempted: REGISTRATION.attempted,
                 registered: REGISTRATION.registered,

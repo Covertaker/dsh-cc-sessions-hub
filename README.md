@@ -4,6 +4,8 @@ Claude Code 会话工作台，跑在 **DeepSeek Harness（DSH）桌面端**里�
 
 > 非官方社区插件，与 DeepSeek、Anthropic 均无隶属关系。
 
+[![smoke](https://github.com/Covertaker/dsh-cc-sessions-hub/actions/workflows/smoke.yml/badge.svg)](https://github.com/Covertaker/dsh-cc-sessions-hub/actions/workflows/smoke.yml)
+
 ## 功能
 
 - **会话列表**：在线/历史、搜索、归档、摘要、fork、后台任务、终端接管。
@@ -11,7 +13,7 @@ Claude Code 会话工作台，跑在 **DeepSeek Harness（DSH）桌面端**里�
 - **审批**：允许 / 始终允许（显示写入目标）/ 拒绝；并发审批分卡处理；AskUserQuestion 选择卡（选项、多选、自由输入）。
 - **会话设置**：权限模式（默认/计划/自动/接受编辑/不询问）、effort（跟随设置 → max）、思考显示开关；默认 **auto + xhigh + 思考显示关**。
 - **命令与 skills**：输入 `/` 或点「命令」出列表，skills 可直接调用；终端专属命令自动过滤。
-- **文件附件**：一个「文件」入口选择 / 拖入 / 粘贴任意本地文件，面板把**绝对路径**交给 CC，CC 自行读取（Word/Excel 由 CC 自己找工具）；截图粘贴为内联图片，不落盘。**仅桌面端支持文件路径**。
+- **文件附件**：一个「文件」入口选择 / 拖入 / 粘贴任意本地文件，面板把**绝对路径**交给 CC，CC 自行读取（Word/Excel 由 CC 自己找工具）；截图粘贴为内联图片（长边压到 1568px），不落盘。**仅桌面端支持文件路径**。
 - **文件预览**：Markdown（含表格）、HTML（sandbox 禁脚本）、PDF、Word/ODT（本机 LibreOffice 转 PDF）、图片、文本；纯文本（如 `.jsonl`）没有默认应用时自动用文本编辑器打开。
 - **子代理过程**：会话行、对话标题栏都有「子代理（N）」入口，点开直接看，不必先进对话；Task/Agent 卡上也可展开单条。运行中每 1.2s 刷新。
 - **完整工具输出**：截断的结果可一键读取转录里的完整内容。
@@ -22,9 +24,12 @@ Claude Code 会话工作台，跑在 **DeepSeek Harness（DSH）桌面端**里�
 |---|---|
 | **DSH 桌面端** | 在 `0.2.2-rc.2` 上测试（开发期亦覆盖 rc.1）；插件使用其客户端私有服务（layout / sidebar / slots 等），**DSH 升级可能失效** |
 | **Claude Code CLI** | 已在本机 `2.1.323` 上测试；需要已登录，`claude` 在 PATH 或 `CLAUDE_CODE_BIN` |
+| **Agent SDK** | 钉在 `@anthropic-ai/claude-agent-sdk@0.3.323`（内置 CLI 2.1.323） |
 | **Node.js** | ≥ 22（插件与 SDK 运行在 DSH 主进程） |
 | **macOS** | 文件「打开 / Finder」与 LibreOffice 路径按 macOS 实现；Windows/Linux 需自行适配 |
 | **LibreOffice**（可选） | Word/ODT 预览需要；未装时提示"用系统应用打开" |
+
+> CLI 版本与测试版（`2.1.323`）不一致时，对话页顶部会显示黄条提示；不阻断使用。
 
 ## 安装
 
@@ -36,6 +41,8 @@ npm install
 # 装进 desktop profile（会创建 link 依赖；多数版本同时把包加入 bundle 列表）
 dsh plugin --profile desktop add link:$PWD
 ```
+
+> `package-lock.json` 指向官方 npm 源；网络受限时可配置镜像，npm 会按 `replace-registry-host` 改写。
 
 确认 `~/.dsh/profiles/desktop/package.json` 的 `dsh.profile.bundles` 里有 `dsh-cc-sessions-hub`；没有则手动加入。**完全退出并重启 DSH**。
 
@@ -60,7 +67,8 @@ dsh plugin --profile desktop add link:$PWD
 
 ## 安全模型
 
-- 插件在**本机 loopback** 上注册 HTTP 路由；每次启动生成随机 token，`/chat/token` 只对同源可读，除 token 与图片原始流外所有请求校验 `x-cc-hub-token`。
+- 插件在**本机 loopback** 上注册 HTTP 路由。**仅适用于 DSH 绑定 loopback 的场景：不要把 DSH 端口暴露到网络或反向代理。**
+- **token 只用于阻止浏览器跨站请求（CSRF），不是身份认证**：`/chat/token` 对不带 `sec-fetch-site` 的本地客户端也会返回 token；`/_ccpanel/sessions|digest|merge|diag` 只校验 loopback Host。其余 `/chat/*`、`/file/*`、`/pick-dir`、`/open` 需要 `x-cc-hub-token`（`/file/raw` 图片流除外，`<img>` 不能带 header）。
 - **文件预览可读任意绝对路径**；「打开」会调用系统默认应用（`open`），「Finder」会 `open -R`。仅在本机可信环境使用。
 - 插件**不含遥测**，不会把会话内容发往任何地方（除了 Claude Code 自身的模型/API 请求）。
 - 面板会话与终端会话使用同一份 `~/.claude` 配置、hooks 与转录；权限行为与终端一致。
@@ -76,6 +84,7 @@ dsh plugin --profile desktop add link:$PWD
 - 无模型选择器（模型跟随 CC settings）；无终端快捷键（Esc/Ctrl+C 等），只有「停止」按钮。
 - 子代理过程只展开一层；运行中轮询 1.2s。
 - **文件路径附件仅桌面端**：网页端只能把图片内联粘贴，非图片文件会提示改用桌面端。
+- 截图会先压到长边 1568px；压缩后仍超过 1.5MB 会提示缩小。
 - 面板会话空闲 30 分钟后回收；下次发送会 resume。
 
 ## 开发与测试
