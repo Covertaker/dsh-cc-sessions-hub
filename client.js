@@ -1393,7 +1393,11 @@ window.__ModuleLoader__.load({
 
     /** Small Markdown subset; every node is React-built, no raw HTML. */
     function markdownBlocks(text, onOpenPath, cwd) {
-      const lines = String(text ?? '').split('\n')
+      // Transcripts written on Windows carry CRLF; a stray \r at the end of a
+      // line makes `.` (which never matches \r) fail the heading test while the
+      // loop guards still match the prefix — that combination used to spin the
+      // paragraph loop forever and take the renderer down with it.
+      const lines = String(text ?? '').replace(/\r\n?/g, '\n').split('\n')
       const nodes = []
       let i = 0
       let key = 0
@@ -1565,6 +1569,13 @@ window.__ModuleLoader__.load({
           !/^(#{1,6})\s|^```|^\s*([-*+])\s+|^\s*\d+\.\s+|^>/.test(lines[i])
         ) {
           buf.push(lines[i])
+          i += 1
+        }
+        if (buf.length === 0) {
+          // Nothing above claimed this line and the loop refuses it: step past
+          // it instead of leaving `i` untouched. Every branch must advance, or
+          // one odd line freezes the whole panel.
+          buf.push(line)
           i += 1
         }
         nodes.push(
