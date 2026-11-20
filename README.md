@@ -65,6 +65,7 @@ dsh plugin --profile desktop add link:$PWD
 5. 点消息或工具卡里的路径即可预览；标题栏不再提供固定的预览入口。
 6. 会话行或对话标题栏点「子代理（N）」看整个会话的子代理；Task/Agent 卡上可直接展开单条。
 7. 行首 `☆` 收藏；行尾「⋯ → 标签与备注…」编辑标签／备注；多选后底部操作条可批量收藏、加标签、删除。删除进「回收站」（标题栏右侧），可恢复或彻底删除。
+8. 保存后的**标签显示在标题下方**（蓝色圆片），**备注显示为一行「备注：…」**；两者都会被搜索框命中。
 
 ## 配置
 
@@ -105,6 +106,8 @@ dsh plugin --profile desktop add link:$PWD
 ```bash
 node scripts/smoke-chat.mjs          # 离线：解析/路由/token/审批/预览/SSE/问题卡/标记与回收站
 node scripts/smoke-chat.mjs --live   # 联网：再加一轮真实模型调用
+node scripts/test-client-marks.mjs   # 行内编辑器：标签/备注的保存请求体（含未回车的标签）
+node scripts/test-client-markdown.mjs # 客户端 Markdown 渲染回归
 ```
 
 冒烟脚本用 `CC_HUB_DATA` / `CC_HUB_CLAUDE_DIR` 把标记与回收站指向临时目录，不碰真实 `~/.claude`。

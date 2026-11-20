@@ -905,10 +905,22 @@ window.__ModuleLoader__.load({
         setTagInput('')
       }
 
-      const saveEditor = () =>
-        runMeta({ action: 'edit', ids: [row.id], tags: tagDraft, note: noteDraft }).then((payload) => {
-          if (payload) setEditing(false)
+      /** A tag typed but not yet committed with Enter must not be lost on save. */
+      const pendingTag = () => {
+        const value = tagInput.trim().replace(/\s+/g, ' ').slice(0, 24)
+        return value && !tagDraft.includes(value) && tagDraft.length < 12 ? value : ''
+      }
+
+      const saveEditor = () => {
+        const pending = pendingTag()
+        const tags = pending ? [...tagDraft, pending] : tagDraft
+        return runMeta({ action: 'edit', ids: [row.id], tags, note: noteDraft }).then((payload) => {
+          if (!payload) return
+          setTagDraft(tags)
+          setTagInput('')
+          setEditing(false)
         })
+      }
 
       const removeRow = () => {
         setMetaBusy(true)
@@ -1026,26 +1038,6 @@ window.__ModuleLoader__.load({
                 { style: { fontSize: 10.5, color: T.caption, fontFamily: MONO, flex: '0 0 auto' } },
                 shortId(row.id),
               ),
-              ...meta.tags.slice(0, 4).map((tag) =>
-                h(
-                  'span',
-                  {
-                    key: `tag-${tag}`,
-                    style: {
-                      fontSize: 10,
-                      lineHeight: '15px',
-                      padding: '0 6px',
-                      borderRadius: R.pill,
-                      color: T.accentText,
-                      background: ACCENT_SOFT,
-                      border: `${HAIRLINE} solid ${ACCENT_LINE}`,
-                      whiteSpace: 'nowrap',
-                      flex: '0 0 auto',
-                    },
-                  },
-                  tag,
-                ),
-              ),
               h(
                 'span',
                 {
@@ -1060,20 +1052,56 @@ window.__ModuleLoader__.load({
                 [row.kind, row.preview].filter(Boolean).join(' · '),
               ),
             ),
+            meta.tags.length > 0
+              ? h(
+                  'span',
+                  {
+                    style: {
+                      display: 'flex',
+                      gap: 4,
+                      alignItems: 'center',
+                      minWidth: 0,
+                      overflow: 'hidden',
+                      paddingTop: 1,
+                    },
+                  },
+                  ...meta.tags.map((tag) =>
+                    h(
+                      'span',
+                      {
+                        key: `tag-${tag}`,
+                        title: `标签：${tag}`,
+                        style: {
+                          fontSize: 10.5,
+                          lineHeight: '16px',
+                          padding: '0 7px',
+                          borderRadius: R.pill,
+                          color: T.accentText,
+                          background: ACCENT_SOFT,
+                          border: `${HAIRLINE} solid ${ACCENT_LINE}`,
+                          whiteSpace: 'nowrap',
+                          flex: '0 0 auto',
+                        },
+                      },
+                      tag,
+                    ),
+                  ),
+                )
+              : null,
             meta.note
               ? h(
                   'span',
                   {
                     title: meta.note,
                     style: {
-                      fontSize: 10.5,
+                      fontSize: 11,
                       color: T.sub,
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
                       whiteSpace: 'nowrap',
                     },
                   },
-                  `✎ ${meta.note}`,
+                  `备注：${meta.note}`,
                 )
               : null,
           ),
@@ -1333,8 +1361,9 @@ window.__ModuleLoader__.load({
                       h('input', {
                         value: tagInput,
                         list: `ccs-tags-${row.id}`,
-                        placeholder: tagDraft.length >= 12 ? '已达 12 个上限' : '加标签，回车确认',
+                        placeholder: tagDraft.length >= 12 ? '已达 12 个上限' : '加标签（回车确认，保存时也会收下）',
                         onChange: (event) => setTagInput(event.target.value),
+                        onBlur: commitTag,
                         onKeyDown: (event) => {
                           if (event.key === 'Enter') {
                             event.preventDefault()
@@ -4343,6 +4372,7 @@ window.__ModuleLoader__.load({
           postJson(`${SESSION_API}/meta`, body)
             .then((payload) => {
               applyMetaPayload(payload)
+              if (body?.action === 'edit') setNotice({ text: '已保存标签与备注', tone: T.ok })
               return payload
             })
             .catch((cause) => {
