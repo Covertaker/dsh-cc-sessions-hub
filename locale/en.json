@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "CC Sessions Hub",
-    "description": "列表本机 Claude Code 会话，支持面板内对话、摘要、终端接管与 fork。"
+    "description": "列表本机 Claude Code 会话，支持面板内对话、摘要、终端接管与 fork，可为会话收藏／打标签／写备注，删除进回收站可恢复。"
   }
 }

@@ -25,6 +25,8 @@ import {
 } from './engine.js'
 import { fullTool, headMeta, historyFor, listSubagents, subagentFor } from './history.js'
 import { openWithDefaultApp, pdfFile, previewFile, readImage, revealInFinder } from './files.js'
+import { applyMeta, listTrash, purgeTrash, restoreTrash, trashSession } from './store.js'
+import { OWNED } from './owned.js'
 import { TOKEN } from './token.js'
 
 const PROJECTS_DIR = join(homedir(), '.claude', 'projects')
@@ -660,6 +662,85 @@ async function handleOpen(request, response) {
   return sendJson(response, 200, { ok: true, editor })
 }
 
+/* ── session marks & trash ─────────────────────────────────────────── */
+
+/**
+ * Favorites / tags / notes plus the soft-delete trash.
+ *
+ * Deleting is guarded on both sides of the write: the transcript is located
+ * here (never supplied by the client), and a session that a terminal or this
+ * panel still owns is refused. Moving files under a live writer is exactly the
+ * double-write this plugin refuses everywhere else.
+ */
+async function handleSession(request, response) {
+  const url = new URL(request.url, 'http://placeholder.invalid')
+  const path = url.pathname.replace(/\/+$/, '')
+  const method = request.method ?? 'GET'
+
+  if (path === '/_ccpanel/session/meta' && method === 'POST') {
+    const body = await readBody(request)
+    return sendJson(response, 200, await applyMeta(body))
+  }
+
+  if (path === '/_ccpanel/session/trash' && method === 'GET') {
+    return sendJson(response, 200, { entries: await listTrash() })
+  }
+
+  if (path === '/_ccpanel/session/trash/restore' && method === 'POST') {
+    const body = await readBody(request)
+    if (!body.entry) throw new HttpError(400, '缺少 entry')
+    return sendJson(response, 200, await restoreTrash(String(body.entry)))
+  }
+
+  if (path === '/_ccpanel/session/trash/purge' && method === 'POST') {
+    const body = await readBody(request)
+    if (!body.entry) throw new HttpError(400, '缺少 entry')
+    return sendJson(response, 200, await purgeTrash(String(body.entry)))
+  }
+
+  if (path === '/_ccpanel/session/delete' && method === 'POST') {
+    const body = await readBody(request)
+    const ids = [...new Set((Array.isArray(body.ids) ? body.ids : [body.id]).filter(Boolean).map(String))].slice(0, 200)
+    if (ids.length === 0) throw new HttpError(400, '缺少 ids')
+    const live = await liveSessionIds(true)
+    const deleted = []
+    const failed = []
+    for (const id of ids) {
+      const runtime = RUNTIMES.get(id)
+      if ((runtime && runtime.started) || OWNED.has(id)) {
+        failed.push({ id, reason: '面板正在使用该会话，先在面板里结束' })
+        continue
+      }
+      if (live.has(id)) {
+        failed.push({ id, reason: '会话仍在线，先在终端结束再删' })
+        continue
+      }
+      const located = await locateTranscript(id)
+      if (!located) {
+        failed.push({ id, reason: '找不到转录文件' })
+        continue
+      }
+      const meta = await headMeta(located.path).catch(() => ({}))
+      try {
+        const result = await trashSession({
+          id,
+          transcript: located.path,
+          project: located.project,
+          title: meta.firstPrompt ?? '',
+          cwd: meta.cwd ?? '',
+          kind: 'recorded',
+        })
+        deleted.push({ id, entry: result.entry })
+      } catch (error) {
+        failed.push({ id, reason: String(error?.message ?? error) })
+      }
+    }
+    return sendJson(response, 200, { deleted, failed })
+  }
+
+  return sendJson(response, 404, { error: `未知路由 ${method} ${path}` })
+}
+
 /* ── registration ──────────────────────────────────────────────────── */
 
 export function registerChatRoutes(ctx) {
@@ -697,6 +778,7 @@ export function registerChatRoutes(ctx) {
   add('/_ccpanel/file', handleFile)
   add('/_ccpanel/pick-dir', handlePickDir)
   add('/_ccpanel/open', handleOpen)
+  add('/_ccpanel/session', handleSession)
 
   const timer = setInterval(() => {
     try {

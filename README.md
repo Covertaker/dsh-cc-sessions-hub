@@ -9,6 +9,8 @@ Claude Code 会话工作台，跑在 **DeepSeek Harness（DSH）桌面端**里�
 ## 功能
 
 - **会话列表**：在线/历史、搜索、归档、摘要、fork、后台任务、终端接管。
+- **会话标记**：星标收藏、自由标签（输入时补全已有标签）、备注；标记可被搜索，多选后可批量收藏／加标签／删除。
+- **回收站**：删除是软删——转录、子代理过程、`file-history` 快照一起移进本机回收站，可原样恢复或彻底删除；在线会话与面板占用的会话不允许删。
 - **面板内对话**：打开历史会话直接续聊；发送/停止；SSE 增量（长回答逐字）；加载更早。
 - **审批**：允许 / 始终允许（显示写入目标）/ 拒绝；并发审批分卡处理；AskUserQuestion 选择卡（选项、多选、自由输入）。
 - **会话设置**：权限模式（默认/计划/自动/接受编辑/不询问）、effort（跟随设置 → max）、思考显示开关；默认 **auto + xhigh + 思考显示关**。
@@ -62,12 +64,13 @@ dsh plugin --profile desktop add link:$PWD
 4. 终端里正在跑的会话显示**只读**，点「fork 到面板」才能继续（cc 无文件锁，避免双写分叉）。
 5. 点消息或工具卡里的路径即可预览；标题栏不再提供固定的预览入口。
 6. 会话行或对话标题栏点「子代理（N）」看整个会话的子代理；Task/Agent 卡上可直接展开单条。
+7. 行首 `☆` 收藏；行尾「⋯ → 标签与备注…」编辑标签／备注；多选后底部操作条可批量收藏、加标签、删除。删除进「回收站」（标题栏右侧），可恢复或彻底删除。
 
 ## 配置
 
 | 变量 | 作用 |
 |---|---|
-| `CC_HUB_CHAT=0` | 关闭对话功能，只保留列表/摘要/终端接管（回滚开关） |
+| `CC_HUB_CHAT=0` | 关闭对话功能，只保留列表/摘要/终端接管（回滚开关）；标记与回收站路由随对话半部一起关闭 |
 | `CC_HUB_WINDOW=60` | 调小单次渲染窗口（默认 250），用于测试分页 |
 | `CLAUDE_CODE_BIN` | 指定 `claude` 可执行文件路径 |
 
@@ -76,6 +79,7 @@ dsh plugin --profile desktop add link:$PWD
 - 插件在**本机 loopback** 上注册 HTTP 路由。**仅适用于 DSH 绑定 loopback 的场景：不要把 DSH 端口暴露到网络或反向代理。**
 - **token 只用于阻止浏览器跨站请求（CSRF），不是身份认证**：`/chat/token` 对不带 `sec-fetch-site` 的本地客户端也会返回 token；`/_ccpanel/sessions|digest|merge|diag` 只校验 loopback Host。其余 `/chat/*`、`/file/*`、`/pick-dir`、`/open` 需要 `x-cc-hub-token`（`/file/raw` 图片流除外，`<img>` 不能带 header）。
 - **文件预览可读任意绝对路径**；「打开」会调用系统默认应用（macOS `open` / Windows `cmd start` + `rundll32` 兜底），「Finder / 资源管理器」会定位到文件（`open -R` / `explorer /select`）。仅在本机可信环境使用。
+- **会话标记与回收站只在本机**：收藏／标签／备注在 `~/.claude/cc-sessions-hub/meta.json`，软删的文件在 `~/.claude/cc-sessions-hub/trash/`。删除接口只接受 sessionId，转录路径由宿主自己解析；`~/.claude/projects` 之外的路径一律拒绝。在线会话、面板占用的会话不可删。
 - 插件**不含遥测**，不会把会话内容发往任何地方（除了 Claude Code 自身的模型/API 请求）。
 - 面板会话与终端会话使用同一份 `~/.claude` 配置、hooks 与转录；权限行为与终端一致。
 
@@ -93,13 +97,17 @@ dsh plugin --profile desktop add link:$PWD
 - **文件路径附件仅桌面端**：网页端只能把图片内联粘贴，非图片文件会提示改用桌面端。
 - 截图会先压到长边 1568px；压缩后仍超过 1.5MB 会提示缩小。
 - 面板会话空闲 30 分钟后回收；下次发送会 resume。
+- 回收站不动 `~/.claude/history.jsonl`（全局输入历史）和 `sessions-index.json` 的陈旧条目——两者由 Claude Code 自己管理，外部改写有并发写风险；实测该索引指向不存在文件的条目会被 CC 正常忽略。
+- 标记以 sessionId 为键：彻底删除回收站条目后标记随之消失；恢复时随条目一起回来。
 
 ## 开发与测试
 
 ```bash
-node scripts/smoke-chat.mjs          # 离线：解析/路由/token/审批/预览/SSE/问题卡
+node scripts/smoke-chat.mjs          # 离线：解析/路由/token/审批/预览/SSE/问题卡/标记与回收站
 node scripts/smoke-chat.mjs --live   # 联网：再加一轮真实模型调用
 ```
+
+冒烟脚本用 `CC_HUB_DATA` / `CC_HUB_CLAUDE_DIR` 把标记与回收站指向临时目录，不碰真实 `~/.claude`。
 
 结构：
 
@@ -109,6 +117,9 @@ host/engine.js      Agent SDK 运行时：常驻进程、流式、审批、中�
 host/history.js     JSONL 转录 → 渲染项（含子代理）
 host/files.js       文件预览与系统打开
 host/routes.js      /_ccpanel/* 路由（Node handler，支持 POST/SSE）
+host/store.js       会话标记（收藏／标签／备注）与回收站（软删／恢复／彻底删）
+host/owned.js       面板当前持有进程的会话集合（列表路由的并发护栏）
+host/token.js       进程级 CSRF token
 client.js           DSH 主面板 UI（列表 + 对话 + 预览 + 子代理抽屉）
 ```
 

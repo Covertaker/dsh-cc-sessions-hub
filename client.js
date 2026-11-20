@@ -6,6 +6,7 @@ window.__ModuleLoader__.load({
 
     const PANEL_ID = 'cc-sessions'
     const ENDPOINT = '/_ccpanel/sessions'
+    const SESSION_API = '/_ccpanel/session'
     const WAIT_STEP_MS = 60
 
     // Host OS decides path rules and the label of the "reveal" verb. The
@@ -842,16 +843,33 @@ window.__ModuleLoader__.load({
     /* ── rows ────────────────────────────────────────────────────────── */
 
     const GRID = '26px 86px minmax(150px,1.5fr) minmax(110px,1fr) 92px auto'
-    function Row({ row, selected, onToggleSelect, onTakeOver, onOpen, onRelease, onSubagents }) {
+
+    /** Marks ride on the row; keep every field shaped even for old host payloads. */
+    function metaOf(row) {
+      const meta = row?.meta
+      return {
+        favorite: meta?.favorite === true,
+        tags: Array.isArray(meta?.tags) ? meta.tags : [],
+        note: typeof meta?.note === 'string' ? meta.note : '',
+      }
+    }
+    function Row({ row, selected, onToggleSelect, onTakeOver, onOpen, onRelease, onSubagents, onMeta, onDelete, tagOptions }) {
       const [open, setOpen] = React.useState(false)
       const [busy, setBusy] = React.useState(false)
       const [hover, setHover] = React.useState(false)
       const [showDigest, setShowDigest] = React.useState(false)
       const [menu, setMenu] = React.useState(false)
       const [ask, setAsk] = React.useState('')
+      const [editing, setEditing] = React.useState(false)
+      const [confirmDelete, setConfirmDelete] = React.useState(false)
+      const [metaBusy, setMetaBusy] = React.useState(false)
+      const [tagDraft, setTagDraft] = React.useState([])
+      const [tagInput, setTagInput] = React.useState('')
+      const [noteDraft, setNoteDraft] = React.useState('')
       const resumable = Boolean(row.path)
       const topic = row.title || row.firstPrompt || row.preview || ''
       const title = topic || row.name || shortId(row.id)
+      const meta = metaOf(row)
 
       const run = (fork) => {
         if (busy) return
@@ -859,6 +877,47 @@ window.__ModuleLoader__.load({
         Promise.resolve(onTakeOver(row, fork))
           .catch(() => {})
           .finally(() => setBusy(false))
+      }
+
+      const runMeta = (body) => {
+        if (metaBusy) return Promise.resolve(null)
+        setMetaBusy(true)
+        return Promise.resolve(onMeta?.(row, body))
+          .catch(() => null)
+          .finally(() => setMetaBusy(false))
+      }
+
+      const toggleFavorite = () => runMeta({ action: 'favorite', ids: [row.id], value: !meta.favorite })
+
+      const openEditor = () => {
+        setTagDraft(meta.tags.slice())
+        setNoteDraft(meta.note)
+        setTagInput('')
+        setOpen(true)
+        setEditing(true)
+        setMenu(false)
+      }
+
+      const commitTag = () => {
+        const value = tagInput.trim().replace(/\s+/g, ' ').slice(0, 24)
+        if (!value) return
+        setTagDraft((list) => (list.includes(value) || list.length >= 12 ? list : [...list, value]))
+        setTagInput('')
+      }
+
+      const saveEditor = () =>
+        runMeta({ action: 'edit', ids: [row.id], tags: tagDraft, note: noteDraft }).then((payload) => {
+          if (payload) setEditing(false)
+        })
+
+      const removeRow = () => {
+        setMetaBusy(true)
+        Promise.resolve(onDelete?.(row))
+          .catch(() => {})
+          .finally(() => {
+            setMetaBusy(false)
+            setConfirmDelete(false)
+          })
       }
 
       return h(
@@ -903,33 +962,61 @@ window.__ModuleLoader__.load({
             { style: { display: 'flex', flexDirection: 'column', gap: 1, minWidth: 0 } },
             h(
               'span',
-              {
-                title: resumable && onOpen ? `${title} — 点击进入对话` : title,
-                onClick:
-                  resumable && onOpen
-                    ? (event) => {
-                        event.stopPropagation()
-                        onOpen(row)
-                      }
-                    : undefined,
-                style: {
-                  fontSize: FS,
-                  color: T.text,
-                  fontWeight: row.live ? 500 : 400,
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                  cursor: resumable && onOpen ? 'pointer' : 'default',
-                  textDecoration: resumable && onOpen ? 'underline dotted transparent' : 'none',
+              { style: { display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 } },
+              h(
+                'button',
+                {
+                  type: 'button',
+                  className: 'ccs-ctl',
+                  title: meta.favorite ? '取消收藏' : '收藏',
+                  onClick: (event) => {
+                    event.stopPropagation()
+                    toggleFavorite()
+                  },
+                  style: {
+                    appearance: 'none',
+                    border: 'none',
+                    background: 'transparent',
+                    padding: 0,
+                    cursor: 'pointer',
+                    fontSize: 13,
+                    lineHeight: 1,
+                    flex: '0 0 auto',
+                    color: meta.favorite ? T.warn : T.faint,
+                  },
                 },
-                onMouseEnter: (event) => {
-                  if (resumable && onOpen) event.currentTarget.style.textDecorationColor = T.lineStrong
+                meta.favorite ? '★' : '☆',
+              ),
+              h(
+                'span',
+                {
+                  title: resumable && onOpen ? `${title} — 点击进入对话` : title,
+                  onClick:
+                    resumable && onOpen
+                      ? (event) => {
+                          event.stopPropagation()
+                          onOpen(row)
+                        }
+                      : undefined,
+                  style: {
+                    fontSize: FS,
+                    color: T.text,
+                    fontWeight: row.live ? 500 : 400,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                    cursor: resumable && onOpen ? 'pointer' : 'default',
+                    textDecoration: resumable && onOpen ? 'underline dotted transparent' : 'none',
+                  },
+                  onMouseEnter: (event) => {
+                    if (resumable && onOpen) event.currentTarget.style.textDecorationColor = T.lineStrong
+                  },
+                  onMouseLeave: (event) => {
+                    if (resumable && onOpen) event.currentTarget.style.textDecorationColor = 'transparent'
+                  },
                 },
-                onMouseLeave: (event) => {
-                  if (resumable && onOpen) event.currentTarget.style.textDecorationColor = 'transparent'
-                },
-              },
-              title,
+                title,
+              ),
             ),
             h(
               'span',
@@ -938,6 +1025,26 @@ window.__ModuleLoader__.load({
                 'span',
                 { style: { fontSize: 10.5, color: T.caption, fontFamily: MONO, flex: '0 0 auto' } },
                 shortId(row.id),
+              ),
+              ...meta.tags.slice(0, 4).map((tag) =>
+                h(
+                  'span',
+                  {
+                    key: `tag-${tag}`,
+                    style: {
+                      fontSize: 10,
+                      lineHeight: '15px',
+                      padding: '0 6px',
+                      borderRadius: R.pill,
+                      color: T.accentText,
+                      background: ACCENT_SOFT,
+                      border: `${HAIRLINE} solid ${ACCENT_LINE}`,
+                      whiteSpace: 'nowrap',
+                      flex: '0 0 auto',
+                    },
+                  },
+                  tag,
+                ),
               ),
               h(
                 'span',
@@ -953,6 +1060,22 @@ window.__ModuleLoader__.load({
                 [row.kind, row.preview].filter(Boolean).join(' · '),
               ),
             ),
+            meta.note
+              ? h(
+                  'span',
+                  {
+                    title: meta.note,
+                    style: {
+                      fontSize: 10.5,
+                      color: T.sub,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    },
+                  },
+                  `✎ ${meta.note}`,
+                )
+              : null,
           ),
           h(
             'span',
@@ -1044,12 +1167,18 @@ window.__ModuleLoader__.load({
                   },
                   ...[
                     {
+                      label: meta.favorite ? '取消收藏' : '收藏',
+                      run: () => { toggleFavorite(); setMenu(false) },
+                    },
+                    { label: '标签与备注…', run: openEditor },
+                    {
                       label: showDigest ? '收起摘要' : '查看摘要',
                       run: () => { setShowDigest((value) => !value); setMenu(false) },
                     },
                     { label: '复制 resume 命令', run: () => { copyText(resumeCommand(row)); setMenu(false) } },
                     { label: '复制 fork 命令', run: () => { copyText(forkCommand(row)); setMenu(false) } },
                     { label: open ? '收起详情' : '展开详情', run: () => { setOpen((value) => !value); setMenu(false) } },
+                    { label: '删除…', danger: true, run: () => { setConfirmDelete(true); setOpen(true); setMenu(false) } },
                   ].map((item) =>
                     h(
                       'button',
@@ -1064,7 +1193,7 @@ window.__ModuleLoader__.load({
                           appearance: 'none',
                           border: 'none',
                           background: 'transparent',
-                          color: T.sub,
+                          color: item.danger ? T.err : T.sub,
                           fontFamily: 'inherit',
                           fontSize: FS2,
                           textAlign: 'left',
@@ -1145,11 +1274,212 @@ window.__ModuleLoader__.load({
                 resumable ? h(CopyButton, { label: '复制 resume 命令', value: resumeCommand(row) }) : null,
                 resumable ? h(CopyButton, { label: '复制 fork 命令', value: forkCommand(row) }) : null,
               ),
+              editing
+                ? h(
+                    'div',
+                    {
+                      style: {
+                        borderTop: `${HAIRLINE} solid ${T.line}`,
+                        paddingTop: 10,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 8,
+                      },
+                    },
+                    h('span', { style: { fontSize: 11, color: T.caption } }, '标签与备注（只存在本机）'),
+                    h(
+                      'span',
+                      { style: { display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' } },
+                      ...tagDraft.map((tag) =>
+                        h(
+                          'span',
+                          {
+                            key: `draft-${tag}`,
+                            style: {
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 4,
+                              fontSize: 11,
+                              lineHeight: '18px',
+                              padding: '0 4px 0 8px',
+                              borderRadius: R.pill,
+                              color: T.accentText,
+                              background: ACCENT_SOFT,
+                              border: `${HAIRLINE} solid ${ACCENT_LINE}`,
+                            },
+                          },
+                          tag,
+                          h(
+                            'button',
+                            {
+                              type: 'button',
+                              title: '移除',
+                              onClick: () => setTagDraft((list) => list.filter((item) => item !== tag)),
+                              style: {
+                                appearance: 'none',
+                                border: 'none',
+                                background: 'transparent',
+                                color: 'inherit',
+                                cursor: 'pointer',
+                                padding: 0,
+                                fontSize: 12,
+                                lineHeight: 1,
+                              },
+                            },
+                            '×',
+                          ),
+                        ),
+                      ),
+                      h('input', {
+                        value: tagInput,
+                        list: `ccs-tags-${row.id}`,
+                        placeholder: tagDraft.length >= 12 ? '已达 12 个上限' : '加标签，回车确认',
+                        onChange: (event) => setTagInput(event.target.value),
+                        onKeyDown: (event) => {
+                          if (event.key === 'Enter') {
+                            event.preventDefault()
+                            commitTag()
+                          }
+                        },
+                        style: {
+                          boxSizing: 'border-box',
+                          width: 150,
+                          padding: '3px 8px',
+                          fontSize: FS2,
+                          color: T.text,
+                          background: T.base,
+                          border: `${HAIRLINE} solid ${T.line}`,
+                          borderRadius: 6,
+                          outline: 'none',
+                          fontFamily: 'inherit',
+                        },
+                      }),
+                      h(
+                        'datalist',
+                        { id: `ccs-tags-${row.id}` },
+                        ...(tagOptions || [])
+                          .filter((tag) => !tagDraft.includes(tag))
+                          .map((tag) => h('option', { key: `opt-${tag}`, value: tag })),
+                      ),
+                    ),
+                    h('textarea', {
+                      value: noteDraft,
+                      rows: 2,
+                      maxLength: 500,
+                      placeholder: '备注：为什么留着它／下次从哪接着做（只在列表里给自己看）',
+                      onChange: (event) => setNoteDraft(event.target.value),
+                      style: {
+                        boxSizing: 'border-box',
+                        width: '100%',
+                        resize: 'vertical',
+                        padding: '6px 8px',
+                        fontSize: FS2,
+                        lineHeight: 1.55,
+                        color: T.text,
+                        background: T.base,
+                        border: `${HAIRLINE} solid ${T.line}`,
+                        borderRadius: 6,
+                        outline: 'none',
+                        fontFamily: 'inherit',
+                      },
+                    }),
+                    h(
+                      'div',
+                      { style: { display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' } },
+                      h(GhostButton, { onClick: saveEditor, disabled: metaBusy, tone: T.accentText }, metaBusy ? '保存中…' : '保存'),
+                      h(GhostButton, { onClick: () => setEditing(false) }, '取消'),
+                      h(
+                        'span',
+                        { style: { fontSize: 10.5, color: T.caption } },
+                        `${tagDraft.length}/12 个标签 · 备注 ${noteDraft.length}/500`,
+                      ),
+                    ),
+                  )
+                : null,
+              confirmDelete
+                ? h(
+                    'div',
+                    {
+                      style: {
+                        borderTop: `${HAIRLINE} solid ${T.line}`,
+                        paddingTop: 10,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 8,
+                        flexWrap: 'wrap',
+                      },
+                    },
+                    h(
+                      'span',
+                      { style: { flex: '1 1 220px', fontSize: FS2, color: T.text, lineHeight: 1.55 } },
+                      `删除「${title}」？转录、子代理过程、文件历史会移进回收站，可在「回收站」恢复。`,
+                    ),
+                    h(GhostButton, { onClick: removeRow, disabled: metaBusy, tone: T.err }, metaBusy ? '处理中…' : '移入回收站'),
+                    h(GhostButton, { onClick: () => setConfirmDelete(false) }, '取消'),
+                  )
+                : null,
             )
           : null,
         // 摘要独立挂载：以前它在 `open` 分支内，菜单点「查看摘要」只改了状态、
         // 详情没展开就什么都不显示（2026-11-09 修）。
         showDigest ? h('div', { style: { padding: '2px 16px 12px 40px' } }, h(DigestView, { row })) : null,
+      )
+    }
+
+    /** One entry in the trash view: restore, or purge after an explicit confirm. */
+    function TrashRow({ entry, onRestore, onPurge, busy, confirming, onConfirm, onCancel }) {
+      const stamp = Date.parse(entry.deletedAt)
+      const title = entry.title || shortId(entry.id)
+      return h(
+        'div',
+        {
+          className: 'ccs-row',
+          style: {
+            margin: '5px 10px',
+            border: `1px solid ${T.line}`,
+            borderRadius: R.card,
+            background: T.base,
+            boxShadow: SHADOW.card,
+            padding: '9px 12px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 12,
+            flexWrap: 'wrap',
+          },
+        },
+        h(
+          'div',
+          { style: { display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0, flex: '1 1 260px' } },
+          h(
+            'span',
+            { style: { fontSize: FS, color: T.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } },
+            title,
+          ),
+          h(
+            'span',
+            { style: { fontSize: 10.5, color: T.caption, fontFamily: MONO } },
+            [shortId(entry.id), entry.project, sizeText(entry.size)].filter(Boolean).join(' · '),
+          ),
+          h(
+            'span',
+            { style: { fontSize: 10.5, color: T.faint, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } },
+            `${Number.isFinite(stamp) ? absoluteTime(stamp) : entry.deletedAt} · ${entry.cwd || '—'}`,
+          ),
+        ),
+        confirming
+          ? h(
+              'div',
+              { style: { display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' } },
+              h('span', { style: { fontSize: 11, color: T.err } }, '彻底删除后无法恢复'),
+              h(GhostButton, { onClick: onPurge, disabled: busy, tone: T.err }, busy ? '删除中…' : '确认彻底删除'),
+              h(GhostButton, { onClick: onCancel, disabled: busy }, '取消'),
+            )
+          : h(
+              'div',
+              { style: { display: 'flex', alignItems: 'center', gap: 6 } },
+              h(GhostButton, { onClick: onRestore, disabled: busy }, busy ? '恢复中…' : '恢复'),
+              h(GhostButton, { onClick: onConfirm, disabled: busy, tone: T.err }, '彻底删除'),
+            ),
       )
     }
 
@@ -3842,6 +4172,13 @@ window.__ModuleLoader__.load({
       const [chatEnabled, setChatEnabled] = React.useState(true)
       const [platformWarning, setPlatformWarning] = React.useState('')
       const [limit, setLimit] = React.useState(200)
+      const [trashView, setTrashView] = React.useState(false)
+      const [trashEntries, setTrashEntries] = React.useState(null)
+      const [trashError, setTrashError] = React.useState('')
+      const [trashBusy, setTrashBusy] = React.useState('')
+      const [trashConfirm, setTrashConfirm] = React.useState(null)
+      const [batchTag, setBatchTag] = React.useState({ open: false, value: '' })
+      const [batchDelete, setBatchDelete] = React.useState(false)
 
       const load = React.useCallback(() => {
         setLoading(true)
@@ -3921,11 +4258,29 @@ window.__ModuleLoader__.load({
       const archived = all.filter((row) => !row.live)
 
       const rows = React.useMemo(() => {
-        const base = filter === 'live' ? liveRows : filter === 'archived' ? archived : all
+        const base =
+          filter === 'live'
+            ? liveRows
+            : filter === 'archived'
+              ? archived
+              : filter === 'favorite'
+                ? all.filter((row) => metaOf(row).favorite)
+                : all
         const needle = query.trim().toLowerCase()
         if (!needle) return base
         return base.filter((row) =>
-          [row.name, row.id, row.cwd, row.title, row.firstPrompt, row.preview, row.status, row.kind]
+          [
+            row.name,
+            row.id,
+            row.cwd,
+            row.title,
+            row.firstPrompt,
+            row.preview,
+            row.status,
+            row.kind,
+            metaOf(row).tags.join(' '),
+            metaOf(row).note,
+          ]
             .filter(Boolean)
             .some((field) => String(field).toLowerCase().includes(needle)),
         )
@@ -3953,7 +4308,144 @@ window.__ModuleLoader__.load({
       )
       const toggleSelect = (id) =>
         setSelected((list) => (list.includes(id) ? list.filter((item) => item !== id) : [...list, id]))
-      const clearSelect = () => setSelected([])
+      const clearSelect = () => {
+        setSelected([])
+        setBatchDelete(false)
+        setBatchTag({ open: false, value: '' })
+      }
+
+      /** Patch rows in place instead of re-fetching: marks are tiny and the list keeps its expanded rows. */
+      const applyMetaPayload = React.useCallback((payload) => {
+        if (!payload || !payload.updated) return
+        setData((previous) =>
+          previous
+            ? {
+                ...previous,
+                tags: Array.isArray(payload.tags) ? payload.tags : previous.tags,
+                sessions: previous.sessions.map((row) =>
+                  payload.updated[row.id] ? { ...row, meta: payload.updated[row.id] } : row,
+                ),
+              }
+            : previous,
+        )
+      }, [])
+
+      const runMeta = React.useCallback(
+        (row, body) =>
+          postJson(`${SESSION_API}/meta`, body)
+            .then((payload) => {
+              applyMetaPayload(payload)
+              return payload
+            })
+            .catch((cause) => {
+              setNotice({ text: `保存失败：${String(cause?.message ?? cause)}`, tone: T.err })
+              throw cause
+            }),
+        [applyMetaPayload],
+      )
+
+      const runBatchMeta = React.useCallback(
+        (body) =>
+          postJson(`${SESSION_API}/meta`, body).then((payload) => {
+            applyMetaPayload(payload)
+            return payload
+          }),
+        [applyMetaPayload],
+      )
+
+      const deleteRows = React.useCallback(
+        (ids) =>
+          postJson(`${SESSION_API}/delete`, { ids })
+            .then((payload) => {
+              const deleted = Array.isArray(payload?.deleted) ? payload.deleted : []
+              const failed = Array.isArray(payload?.failed) ? payload.failed : []
+              if (failed.length > 0) {
+                setNotice({
+                  text: `${failed.length} 个没删成：${failed[0].reason}`,
+                  tone: T.err,
+                })
+              } else {
+                setNotice({ text: `已把 ${deleted.length} 个会话移进回收站，可在「回收站」恢复`, tone: T.ok })
+              }
+              if (deleted.length > 0) load()
+              return payload
+            })
+            .catch((cause) => {
+              setNotice({ text: `删除失败：${String(cause?.message ?? cause)}`, tone: T.err })
+              throw cause
+            }),
+        [load],
+      )
+
+      const deleteOne = React.useCallback((row) => deleteRows([row.id]), [deleteRows])
+
+      const toggleBatchFavorite = () => {
+        const ids = selectedRows.map((row) => row.id)
+        if (ids.length === 0) return
+        const value = !selectedRows.every((row) => metaOf(row).favorite)
+        runBatchMeta({ action: 'favorite', ids, value })
+          .then(() => setNotice({ text: value ? '已收藏' : '已取消收藏', tone: T.ok }))
+          .catch((cause) => setNotice({ text: String(cause?.message ?? cause), tone: T.err }))
+      }
+
+      const addBatchTag = () => {
+        const tag = batchTag.value.trim().replace(/\s+/g, ' ').slice(0, 24)
+        if (!tag || selectedRows.length === 0) return
+        const ids = selectedRows.map((row) => row.id)
+        runBatchMeta({ action: 'tags', ids, add: [tag] })
+          .then(() => {
+            setBatchTag({ open: false, value: '' })
+            setNotice({ text: `已给 ${ids.length} 个会话加标签「${tag}」`, tone: T.ok })
+          })
+          .catch((cause) => setNotice({ text: String(cause?.message ?? cause), tone: T.err }))
+      }
+
+      const deleteSelected = () => {
+        const ids = selectedRows.map((row) => row.id)
+        deleteRows(ids).then((payload) => {
+          setBatchDelete(false)
+          if (payload?.deleted?.length > 0) clearSelect()
+        })
+      }
+
+      const loadTrash = React.useCallback(() => {
+        setTrashBusy('load')
+        setTrashError('')
+        getJson(`${SESSION_API}/trash`)
+          .then((payload) => setTrashEntries(Array.isArray(payload?.entries) ? payload.entries : []))
+          .catch((cause) => setTrashError(String(cause?.message ?? cause)))
+          .finally(() => setTrashBusy(''))
+      }, [])
+
+      const restoreEntry = React.useCallback(
+        (entry) => {
+          setTrashBusy(entry.entry)
+          postJson(`${SESSION_API}/trash/restore`, { entry: entry.entry })
+            .then(() => {
+              setNotice({ text: '已恢复到原位置', tone: T.ok })
+              loadTrash()
+              load()
+            })
+            .catch((cause) => setNotice({ text: `恢复失败：${String(cause?.message ?? cause)}`, tone: T.err }))
+            .finally(() => setTrashBusy(''))
+        },
+        [loadTrash, load],
+      )
+
+      const purgeEntry = React.useCallback(
+        (entry) => {
+          setTrashBusy(entry.entry)
+          postJson(`${SESSION_API}/trash/purge`, { entry: entry.entry })
+            .then(() => {
+              setNotice({ text: '已彻底删除', tone: T.ok })
+              setTrashConfirm(null)
+              loadTrash()
+            })
+            .catch((cause) => setNotice({ text: `删除失败：${String(cause?.message ?? cause)}`, tone: T.err }))
+            .finally(() => setTrashBusy(''))
+        },
+        [loadTrash],
+      )
 
       const releaseSession = React.useCallback(
         async (row) => {
@@ -4073,6 +4565,21 @@ window.__ModuleLoader__.load({
             recordedTotal && recordedTotal > all.length
               ? h(GhostButton, { onClick: () => setLimit((value) => value + 200), disabled: loading }, '加载更多')
               : null,
+            h(
+              GhostButton,
+              {
+                onClick: () => {
+                  const next = !trashView
+                  setTrashView(next)
+                  if (next) {
+                    loadTrash()
+                    clearSelect()
+                  }
+                },
+                title: '删除的会话移到这里，可恢复或彻底删除',
+              },
+              trashView ? '返回会话' : '回收站',
+            ),
             h(GhostButton, { onClick: load, disabled: loading }, loading ? '刷新中…' : '刷新'),
           ),
           h(
@@ -4102,6 +4609,7 @@ window.__ModuleLoader__.load({
                 { key: 'all', label: '全部', count: all.length },
                 { key: 'live', label: '在线', count: liveRows.length },
                 { key: 'archived', label: '历史', count: archived.length },
+                { key: 'favorite', label: '收藏', count: all.filter((row) => metaOf(row).favorite).length },
               ],
             }),
             h('input', {
@@ -4125,7 +4633,7 @@ window.__ModuleLoader__.load({
             }),
           ),
         ),
-        selectedRows.length > 0
+        !trashView && selectedRows.length > 0
           ? h(
               'div',
               {
@@ -4147,27 +4655,89 @@ window.__ModuleLoader__.load({
                 `已选 ${selectedRows.length} 个会话`,
               ),
               h('span', { style: { flex: '1 1 auto' } }),
-              h(
-                PrimaryButton,
-                {
-                  onClick: () => {
-                    if (selectedRows.length > 6) return
-                    setNotice({ text: '正在建队…', tone: T.sub })
-                    startTeamConversation(selectedRows).then((result) => {
-                      setNotice({ text: result.message, tone: result.ok ? T.ok : T.err })
-                    })
-                  },
-                  disabled: selectedRows.length > 6,
-                  title: selectedRows.length > 6 ? '一次最多 6 个会话' : '开一条新对话，把这几份上下文交给 dsh 主 agent',
-                },
-                '建队开新对话',
-              ),
-              h(
-                GhostButton,
-                { onClick: () => runMerge(selectedRows), disabled: mergeState.status === 'running' },
-                mergeState.status === 'running' ? '合并中…' : '只看合并摘要',
-              ),
-              h(GhostButton, { onClick: clearSelect }, '清空'),
+              ...(batchDelete
+                ? [
+                    h(
+                      'span',
+                      { key: 'confirm-text', style: { fontSize: FS2, color: T.err } },
+                      '确认移进回收站？转录与子代理过程都能恢复',
+                    ),
+                    h(
+                      GhostButton,
+                      { key: 'confirm', onClick: deleteSelected, tone: T.err, disabled: loading },
+                      '确认移入回收站',
+                    ),
+                    h(GhostButton, { key: 'cancel', onClick: () => setBatchDelete(false) }, '取消'),
+                  ]
+                : batchTag.open
+                  ? [
+                      h('input', {
+                        key: 'tag-input',
+                        autoFocus: true,
+                        value: batchTag.value,
+                        placeholder: '标签名，回车确认',
+                        onChange: (event) => setBatchTag({ open: true, value: event.target.value }),
+                        onKeyDown: (event) => {
+                          if (event.key === 'Enter') {
+                            event.preventDefault()
+                            addBatchTag()
+                          }
+                        },
+                        style: {
+                          boxSizing: 'border-box',
+                          width: 150,
+                          padding: '3px 8px',
+                          fontSize: FS2,
+                          color: T.text,
+                          background: T.base,
+                          border: `${HAIRLINE} solid ${T.line}`,
+                          borderRadius: 6,
+                          outline: 'none',
+                          fontFamily: 'inherit',
+                        },
+                      }),
+                      h(GhostButton, { key: 'tag-ok', onClick: addBatchTag }, '确定'),
+                      h(GhostButton, { key: 'tag-cancel', onClick: () => setBatchTag({ open: false, value: '' }) }, '取消'),
+                    ]
+                  : [
+                      h(
+                        GhostButton,
+                        { key: 'favorite', onClick: toggleBatchFavorite },
+                        selectedRows.every((row) => metaOf(row).favorite) ? '取消收藏' : '收藏',
+                      ),
+                      h(
+                        GhostButton,
+                        { key: 'tag', onClick: () => setBatchTag({ open: true, value: '' }) },
+                        '加标签',
+                      ),
+                      h(
+                        PrimaryButton,
+                        {
+                          key: 'team',
+                          onClick: () => {
+                            if (selectedRows.length > 6) return
+                            setNotice({ text: '正在建队…', tone: T.sub })
+                            startTeamConversation(selectedRows).then((result) => {
+                              setNotice({ text: result.message, tone: result.ok ? T.ok : T.err })
+                            })
+                          },
+                          disabled: selectedRows.length > 6,
+                          title: selectedRows.length > 6 ? '一次最多 6 个会话' : '开一条新对话，把这几份上下文交给 dsh 主 agent',
+                        },
+                        '建队开新对话',
+                      ),
+                      h(
+                        GhostButton,
+                        { key: 'merge', onClick: () => runMerge(selectedRows), disabled: mergeState.status === 'running' },
+                        mergeState.status === 'running' ? '合并中…' : '只看合并摘要',
+                      ),
+                      h(
+                        GhostButton,
+                        { key: 'delete', onClick: () => setBatchDelete(true), tone: T.err },
+                        '删除…',
+                      ),
+                      h(GhostButton, { key: 'clear', onClick: clearSelect }, '清空'),
+                    ]),
             )
           : null,
         mergeState.status === 'running'
@@ -4262,7 +4832,9 @@ window.__ModuleLoader__.load({
               `读取失败：${error}`,
             )
           : null,
-        h(
+        trashView
+          ? null
+          : h(
           'div',
           {
             style: {
@@ -4289,36 +4861,88 @@ window.__ModuleLoader__.load({
         h(
           'div',
           { style: { flex: '1 1 auto', overflowY: 'auto', overflowX: 'hidden' } },
-          loading && !data
-            ? h(SkeletonRows, null)
-            : rows.length === 0
+          trashView
             ? h(
                 'div',
-                {
-                  style: {
-                    padding: '48px 16px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    gap: 6,
-                    color: T.caption,
+                { style: { display: 'flex', flexDirection: 'column' } },
+                h(
+                  'div',
+                  {
+                    style: {
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 10,
+                      padding: '10px 16px',
+                      borderBottom: `${HAIRLINE} solid ${T.line}`,
+                      flexWrap: 'wrap',
+                    },
                   },
-                },
-                h('span', { style: { fontSize: FS2 } }, '没有匹配的会话'),
-                h('span', { style: { fontSize: 11 } }, '换个筛选条件，或清空搜索词'),
+                  h('span', { style: { fontSize: FS2, fontWeight: 600, color: T.text } }, '回收站'),
+                  h('span', { style: { fontSize: 11, color: T.caption } }, '删除的会话在这里，恢复会放回原位置'),
+                  h('span', { style: { flex: '1 1 auto' } }),
+                  h(
+                    GhostButton,
+                    { onClick: loadTrash, disabled: trashBusy === 'load' },
+                    trashBusy === 'load' ? '读取中…' : '刷新',
+                  ),
+                ),
+                trashError
+                  ? h('div', { style: { padding: '10px 16px', fontSize: FS2, color: T.err } }, `读取失败：${trashError}`)
+                  : null,
+                !trashEntries
+                  ? h(SkeletonRows, null)
+                  : trashEntries.length === 0
+                    ? h(
+                        'div',
+                        { style: { padding: '48px 16px', textAlign: 'center', fontSize: FS2, color: T.caption } },
+                        '回收站是空的',
+                      )
+                    : trashEntries.map((entry) =>
+                        h(TrashRow, {
+                          key: entry.entry,
+                          entry,
+                          busy: trashBusy === entry.entry || trashBusy === 'load',
+                          confirming: trashConfirm === entry.entry,
+                          onRestore: () => restoreEntry(entry),
+                          onPurge: () => purgeEntry(entry),
+                          onConfirm: () => setTrashConfirm(entry.entry),
+                          onCancel: () => setTrashConfirm(null),
+                        }),
+                      ),
               )
-            : rows.map((row) =>
-                h(Row, {
-                  key: row.id,
-                  row,
-                  selected: selected.includes(row.id),
-                  onToggleSelect: toggleSelect,
-                  onTakeOver,
-                  onRelease: releaseSession,
-                  onOpen: chatEnabled ? openChat : undefined,
-                  onSubagents: chatEnabled ? openSubagents : undefined,
-                }),
-              ),
+            : loading && !data
+              ? h(SkeletonRows, null)
+              : rows.length === 0
+                ? h(
+                    'div',
+                    {
+                      style: {
+                        padding: '48px 16px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        gap: 6,
+                        color: T.caption,
+                      },
+                    },
+                    h('span', { style: { fontSize: FS2 } }, '没有匹配的会话'),
+                    h('span', { style: { fontSize: 11 } }, '换个筛选条件，或清空搜索词'),
+                  )
+                : rows.map((row) =>
+                    h(Row, {
+                      key: row.id,
+                      row,
+                      selected: selected.includes(row.id),
+                      onToggleSelect: toggleSelect,
+                      onTakeOver,
+                      onRelease: releaseSession,
+                      onOpen: chatEnabled ? openChat : undefined,
+                      onSubagents: chatEnabled ? openSubagents : undefined,
+                      onMeta: runMeta,
+                      onDelete: deleteOne,
+                      tagOptions: data?.tags ?? [],
+                    }),
+                  ),
         ),
         subView
           ? h(SubagentDrawer, {

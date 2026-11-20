@@ -4,7 +4,7 @@
  *   node scripts/smoke-chat.mjs          # no network, no Claude call
  *   node scripts/smoke-chat.mjs --live   # one real turn through the installed CLI
  */
-import { mkdir, mkdtemp, readdir, stat, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readdir, rm, stat, writeFile } from 'node:fs/promises'
 import { homedir, tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
@@ -12,6 +12,7 @@ import { countSubagents, fullTool, historyFor, parseTranscript } from '../host/h
 import { pdfFile, previewFile } from '../host/files.js'
 import { RUNTIMES, ccVersionWarning, runtimeFor } from '../host/engine.js'
 import { registerChatRoutes } from '../host/routes.js'
+import { applyMeta, attachMeta, listTrash, purgeTrash, restoreTrash, trashSession } from '../host/store.js'
 import { TOKEN } from '../host/token.js'
 
 const results = []
@@ -94,7 +95,7 @@ const ctx = {
   },
 }
 const dispose = registerChatRoutes(ctx)
-check('路由：注册 4 条', routes.length === 4, routes.map((route) => route.path).join(','))
+check('路由：注册 5 条', routes.length === 5, routes.map((route) => route.path).join(','))
 
 function request({ method = 'GET', url, body, headers = {} }) {
   return {
@@ -458,7 +459,125 @@ check(
   check('图片：非法类型 400', badImage.status === 400, String(badImage.status))
 }
 
-/* 7. optional live turn */
+/* 7. session marks + soft-delete trash */
+{
+  const root = await mkdtemp(join(tmpdir(), 'cc-hub-store-'))
+  const claude = join(root, 'claude')
+  const data = join(root, 'data')
+  const project = join(claude, 'projects', '-smoke-project')
+  const id = randomUUID()
+  const transcript = join(project, `${id}.jsonl`)
+  const child = join(project, id, 'subagents', 'agent-a.jsonl')
+  const historyFile = join(claude, 'file-history', id, 'v1')
+  await mkdir(join(project, id, 'subagents'), { recursive: true })
+  await mkdir(join(claude, 'file-history', id), { recursive: true })
+  await writeFile(
+    transcript,
+    `${JSON.stringify({ type: 'user', sessionId: id, cwd: root, message: { role: 'user', content: '测试会话' } })}\n`,
+  )
+  await writeFile(child, '{}')
+  await writeFile(historyFile, 'snapshot')
+  process.env.CC_HUB_CLAUDE_DIR = claude
+  process.env.CC_HUB_DATA = data
+
+  const exists = async (path) => {
+    try {
+      await stat(path)
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  const favorited = await applyMeta({ action: 'favorite', ids: [id], value: true })
+  check('标记：收藏写入', favorited.updated[id]?.favorite === true)
+  const tagged = await applyMeta({ action: 'tags', ids: [id], add: ['材料', '开发', '材料'] })
+  check('标记：标签去重', tagged.updated[id]?.tags.join(',') === '材料,开发', tagged.updated[id]?.tags.join(','))
+  await applyMeta({ action: 'edit', ids: [id], tags: ['材料'], note: '下次接着做' })
+  const rows = [{ id }]
+  const vocabulary = await attachMeta(rows)
+  check(
+    '标记：行上带收藏/标签/备注',
+    rows[0].meta.favorite === true && rows[0].meta.tags[0] === '材料' && rows[0].meta.note === '下次接着做',
+    JSON.stringify(rows[0].meta),
+  )
+  check('标记：标签词表', vocabulary.length === 1 && vocabulary[0] === '材料', vocabulary.join(','))
+
+  let rejected = false
+  try {
+    await applyMeta({ action: 'favorite', ids: ['../escape'], value: true })
+  } catch {
+    rejected = true
+  }
+  check('标记护栏：非法 id 拒绝', rejected)
+
+  const trashed = await trashSession({ id, transcript, project: '-smoke-project', title: '测试会话', cwd: root })
+  check('删除：转录已移走', !(await exists(transcript)))
+  check('删除：子代理目录一起进回收站', await exists(join(data, 'trash', trashed.entry, 'session-dir', 'subagents', 'agent-a.jsonl')))
+  check('删除：文件历史一起进回收站', await exists(join(data, 'trash', trashed.entry, 'file-history', 'v1')))
+  const trashList = await listTrash()
+  check('回收站：列出一条', trashList.length === 1 && trashList[0].id === id, JSON.stringify(trashList[0] ?? null))
+
+  await restoreTrash(trashed.entry)
+  check('恢复：转录回原位', await exists(transcript))
+  check('恢复：子代理回原位', await exists(child))
+  check('恢复：文件历史回原位', await exists(historyFile))
+  const restored = [{ id }]
+  await attachMeta(restored)
+  check(
+    '恢复：收藏/标签/备注一起回来',
+    restored[0].meta.favorite === true && restored[0].meta.tags[0] === '材料' && restored[0].meta.note === '下次接着做',
+    JSON.stringify(restored[0].meta),
+  )
+
+  const again = await trashSession({ id, transcript, project: '-smoke-project' })
+  await purgeTrash(again.entry)
+  check('彻底删除：回收站条目消失', !(await exists(join(data, 'trash', again.entry))))
+
+  rejected = false
+  try {
+    await trashSession({ id, transcript: join(root, 'outside.jsonl') })
+  } catch {
+    rejected = true
+  }
+  check('删除护栏：projects 之外的路径拒绝', rejected)
+  rejected = false
+  try {
+    await restoreTrash('../escape')
+  } catch {
+    rejected = true
+  }
+  check('回收站护栏：条目名不能越界', rejected)
+
+  const sessionRoute = routes.find((route) => route.path === '/_ccpanel/session')
+  const noToken = await call(
+    sessionRoute,
+    request({ method: 'POST', url: '/_ccpanel/session/meta', body: { action: 'favorite', ids: [id], value: true }, headers: { 'x-cc-hub-token': '' } }),
+  )
+  check('路由：标记接口缺 token 401', noToken.status === 401, String(noToken.status))
+  const viaRoute = await call(
+    sessionRoute,
+    request({ method: 'POST', url: '/_ccpanel/session/meta', body: { action: 'tags', ids: [id], add: ['路由'] } }),
+  )
+  check(
+    '路由：标记接口可用',
+    viaRoute.status === 200 && viaRoute.json?.updated?.[id]?.tags?.includes('路由') === true,
+    viaRoute.body.slice(0, 80),
+  )
+  const trashRoute = await call(sessionRoute, request({ url: '/_ccpanel/session/trash' }))
+  check('路由：回收站列表可用', trashRoute.status === 200 && Array.isArray(trashRoute.json?.entries))
+  const badEntry = await call(
+    sessionRoute,
+    request({ method: 'POST', url: '/_ccpanel/session/trash/purge', body: { entry: '../escape' } }),
+  )
+  check('路由：回收站条目越界 400', badEntry.status === 400, String(badEntry.status))
+
+  delete process.env.CC_HUB_CLAUDE_DIR
+  delete process.env.CC_HUB_DATA
+  await rm(root, { recursive: true, force: true })
+}
+
+/* 8. optional live turn */
 if (process.argv.includes('--live')) {
   const id = randomUUID()
   const runtime = runtimeFor(id, { id, cwd: dir })

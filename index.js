@@ -21,6 +21,7 @@ import { execFile } from 'node:child_process'
 import { OWNED } from './host/owned.js'
 import { countSubagents } from './host/history.js'
 import { CLAUDE_BIN } from './host/engine.js'
+import { attachMeta } from './host/store.js'
 
 const CLAUDE_DIR = join(homedir(), '.claude')
 const PLATFORM = process.platform
@@ -308,6 +309,9 @@ async function collect(options = {}) {
     if (a.live !== b.live) return a.live ? -1 : 1
     return (b.mtime ?? b.startedAt ?? 0) - (a.mtime ?? a.startedAt ?? 0)
   })
+  // Marks (favorite / tags / note) ride along with the rows so the list needs no
+  // second request; the vocabulary powers tag autocomplete.
+  const tags = await attachMeta(sessions)
   // Only the panel asks for badges; the agent tools do not need one readdir per row.
   if (options.subagentCounts) {
     await Promise.all(
@@ -326,6 +330,7 @@ async function collect(options = {}) {
       recordedTotal: recordedResult.total,
       recordedShown: recordedResult.shown,
     },
+    tags,
     sessions,
   }
 }
