@@ -4200,6 +4200,14 @@ window.__ModuleLoader__.load({
         load()
       }, [load])
 
+      // Notices are transient: an operation's result should not sit on screen
+      // forever. Errors keep twice as long as confirmations, and the bar has a ×.
+      React.useEffect(() => {
+        if (!notice) return undefined
+        const timer = setTimeout(() => setNotice(null), notice.tone === T.err ? 8000 : 4000)
+        return () => clearTimeout(timer)
+      }, [notice])
+
       // Chat is a host-side opt-out; the UI follows whatever the host reports.
       React.useEffect(() => {
         getJson('/_ccpanel/diag')
@@ -4810,9 +4818,33 @@ window.__ModuleLoader__.load({
                   color: notice.tone,
                   borderBottom: `${HAIRLINE} solid ${T.line}`,
                   background: T.layer1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
                 },
               },
-              notice.text,
+              h('span', { style: { flex: '1 1 auto' } }, notice.text),
+              h(
+                'button',
+                {
+                  type: 'button',
+                  className: 'ccs-ctl',
+                  title: '关闭提示',
+                  onClick: () => setNotice(null),
+                  style: {
+                    appearance: 'none',
+                    border: 'none',
+                    background: 'transparent',
+                    color: T.caption,
+                    cursor: 'pointer',
+                    padding: '0 2px',
+                    fontSize: 13,
+                    lineHeight: 1,
+                    fontFamily: 'inherit',
+                  },
+                },
+                '×',
+              ),
             )
           : null,
         h(ManagedBand, { onChange: () => setTick((value) => value + 1) }),
