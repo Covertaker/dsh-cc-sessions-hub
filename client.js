@@ -425,18 +425,41 @@ window.__ModuleLoader__.load({
     const withTerm = (command) => `TERM=xterm-256color ${command}`
     const forkCommand = (row) => `claude --resume ${row.id} --fork-session`
 
+    /**
+     * 复制兜底：某些渲染进程里 navigator.clipboard 不可用（非安全上下文／无权限），
+     * 直接返回 false 会让调用方"点了没反应"。用隐藏 textarea + execCommand 再试一次。
+     */
+    function fallbackCopy(value) {
+      try {
+        const area = document.createElement('textarea')
+        area.value = value
+        area.setAttribute('readonly', '')
+        area.style.position = 'fixed'
+        area.style.top = '-1000px'
+        area.style.opacity = '0'
+        document.body.appendChild(area)
+        area.select()
+        const ok = document.execCommand('copy')
+        document.body.removeChild(area)
+        return ok
+      } catch {
+        return false
+      }
+    }
+
     function copyText(text) {
+      const value = String(text)
       try {
         if (navigator.clipboard && navigator.clipboard.writeText) {
-          return navigator.clipboard.writeText(String(text)).then(
+          return navigator.clipboard.writeText(value).then(
             () => true,
-            () => false,
+            () => fallbackCopy(value),
           )
         }
       } catch {
-        /* reported as failure */
+        /* 走兜底 */
       }
-      return Promise.resolve(false)
+      return Promise.resolve(fallbackCopy(value))
     }
 
     /**
@@ -1090,6 +1113,36 @@ window.__ModuleLoader__.load({
     }
 
     /** Small button used inside rows; stops row toggling and row selection clicks. */
+    /**
+     * 菜单里的「复制…」按钮：复用 Action 的外形，但点完要有反馈。
+     * 之前是直接调 copyText() 就把菜单关了，用户看不出成没成。
+     */
+    function CopyAction({ label, value, title }) {
+      const [state, setState] = React.useState('idle')
+      const timer = React.useRef(null)
+      React.useEffect(
+        () => () => {
+          if (timer.current) clearTimeout(timer.current)
+        },
+        [],
+      )
+      const flash = (next) => {
+        setState(next)
+        if (timer.current) clearTimeout(timer.current)
+        timer.current = setTimeout(() => setState('idle'), 1800)
+      }
+      return h(
+        Action,
+        {
+          title: title ?? '复制后到终端粘贴执行',
+          danger: state === 'fail',
+          onClick: () => copyText(value).then((ok) => flash(ok ? 'done' : 'fail')),
+        },
+        // 复制成功后直接把"下一步"写在按钮上，不靠 tooltip
+        state === 'done' ? '已复制 ✓ 到终端粘贴' : state === 'fail' ? '复制失败（权限受限）' : label,
+      )
+    }
+
     function Action({ children, onClick, primary, danger, quiet, disabled, title }) {
       return h(
         'button',
@@ -1308,8 +1361,20 @@ window.__ModuleLoader__.load({
                       busy ? '启动中…' : row.live ? 'fork 打开' : '接管终端',
                     )
                   : null,
-                resumable ? h(Action, { onClick: () => copyText(resumeCommand(row)) }, '复制 resume 命令') : null,
-                resumable ? h(Action, { onClick: () => copyText(forkCommand(row)) }, '复制 fork 命令') : null,
+                resumable
+                  ? h(CopyAction, {
+                      label: '复制 resume 命令',
+                      value: resumeCommand(row),
+                      title: `复制后在终端粘贴：${resumeCommand(row)}（在原会话上继续）`,
+                    })
+                  : null,
+                resumable
+                  ? h(CopyAction, {
+                      label: '复制 fork 命令',
+                      value: forkCommand(row),
+                      title: `复制后在终端粘贴：${forkCommand(row)}（复制一份新会话，原会话不动）`,
+                    })
+                  : null,
                 h(Action, { onClick: () => setShowDigest((value) => !value) }, showDigest ? '收起摘要' : '摘要'),
                 h(Action, { onClick: openEditor }, '标签与备注'),
                 resumable
