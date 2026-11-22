@@ -99,8 +99,6 @@ window.__ModuleLoader__.load({
 .ccs-btn:hover:not(:disabled) { box-shadow: 0 6px 18px rgba(15,23,42,0.08) !important; transform: translateY(-1px); }
 .ccs-btn:active:not(:disabled) { transform: translateY(0); box-shadow: none; }
 .ccs-ctl:focus-visible { outline: 2px solid ${T.accent}; outline-offset: 2px; }
-.ccs-row { transition: ${TRANS}; }
-.ccs-row:hover { box-shadow: ${SHADOW.hover} !important; }
 .ccs-card { transition: ${TRANS}; }
 .ccs-card:hover { box-shadow: ${SHADOW.hover} !important; }
 .ccs-focus:focus-within { box-shadow: 0 0 0 3px ${ACCENT_SOFT}, ${SHADOW.card}; border-color: ${ACCENT_LINE}; }
@@ -114,8 +112,237 @@ window.__ModuleLoader__.load({
 }
 `
 
+    /* ── 档案柜布局（方向 A）：细线分区、侧栏视图、金色只给收藏与备注 ── */
+    const REDESIGN_CSS = `
+.ccs-shell { height: 100%; min-height: 0; position: relative; box-sizing: border-box; padding-top: var(--dsh-frame-top-clearance, 0px); }
+.ccs-app {
+  --ccs-line: var(--dsw-alias-border-l3, rgba(128,128,128,.20));
+  --ccs-line-strong: var(--dsw-alias-border-l2, rgba(128,128,128,.32));
+  --ccs-surface: var(--dsw-alias-bg-base, transparent);
+  --ccs-soft: var(--dsw-alias-bg-layer-1, rgba(128,128,128,.05));
+  --ccs-hover: var(--dsw-alias-interactive-bg-hover, rgba(128,128,128,.10));
+  --ccs-gold: color-mix(in srgb, var(--dsw-alias-state-warn-primary, #a86400) 70%, var(--dsw-alias-label-primary, #1a1a1a));
+  --ccs-gold-soft: color-mix(in srgb, var(--dsw-alias-state-warn-primary, #a86400) 13%, transparent);
+  --ccs-accent: var(--dsw-alias-brand-primary, #4d6bfe);
+  --ccs-accent-soft: color-mix(in srgb, var(--dsw-alias-brand-primary, #4d6bfe) 9%, transparent);
+  display: grid; grid-template-columns: 178px minmax(0, 1fr);
+  height: 100%; min-height: 0;
+  color: var(--dsw-alias-label-primary, currentColor);
+  background: var(--ccs-surface);
+  font-family: var(--dsh-font-family-text, inherit);
+  font-size: var(--dsh-content-font-size, 13px);
+}
+.ccs-serif { font-family: "Songti SC", "STSong", "Noto Serif CJK SC", "Source Han Serif SC", SimSun, serif; }
+.ccs-mono { font-family: var(--dsh-font-family-code, ui-monospace, SFMono-Regular, Menlo, monospace); font-variant-numeric: tabular-nums; }
+
+/* rail */
+.ccs-rail {
+  display: flex; flex-direction: column; gap: 2px;
+  padding: 16px 10px 12px; min-height: 0; overflow: hidden;
+  background: var(--ccs-soft);
+  border-right: 1px solid var(--ccs-line);
+}
+.ccs-rail-head { display: flex; flex-direction: column; gap: 2px; padding: 0 8px 12px; }
+.ccs-rail-head h2 { margin: 0; font-size: 16px; font-weight: 600; line-height: 1.3; letter-spacing: .01em; }
+.ccs-rail-head span { font-size: 11px; color: var(--dsw-alias-label-caption, rgba(128,128,128,.62)); font-variant-numeric: tabular-nums; }
+.ccs-views { display: flex; flex-direction: column; gap: 1px; }
+.ccs-view {
+  display: grid; grid-template-columns: 18px 1fr auto; align-items: center; gap: 8px;
+  appearance: none; border: 0; border-left: 2px solid transparent;
+  background: transparent; color: var(--dsw-alias-label-secondary, rgba(128,128,128,.95));
+  padding: 6px 8px; border-radius: 7px; text-align: left; font: inherit; font-size: 12.5px;
+  cursor: pointer;
+}
+.ccs-view .vi { font-size: 13px; text-align: center; color: var(--dsw-alias-label-tertiary, rgba(128,128,128,.75)); }
+.ccs-view .vc { font-size: 11px; color: var(--dsw-alias-label-caption, rgba(128,128,128,.62)); font-variant-numeric: tabular-nums; }
+.ccs-view:hover { background: var(--ccs-hover); }
+.ccs-view.is-on { background: var(--ccs-surface); color: var(--dsw-alias-label-primary, currentColor); border-left-color: var(--ccs-accent); }
+.ccs-view.is-on .vi { color: var(--ccs-gold); }
+.ccs-view:focus-visible { outline: 2px solid var(--ccs-accent); outline-offset: 1px; }
+.ccs-rail-sep { height: 1px; background: var(--ccs-line); margin: 12px 8px 10px; }
+.ccs-rail-label { padding: 0 8px 6px; font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: var(--dsw-alias-label-caption, rgba(128,128,128,.62)); }
+.ccs-taglist { display: flex; flex-direction: column; gap: 1px; min-height: 0; overflow: auto; }
+.ccs-tag-btn {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  appearance: none; border: 0; background: transparent; color: var(--dsw-alias-label-secondary, rgba(128,128,128,.95));
+  padding: 4px 8px; border-radius: 6px; text-align: left; font: inherit; font-size: 12px; cursor: pointer;
+}
+.ccs-tag-btn span { font-size: 10.5px; color: var(--dsw-alias-label-caption, rgba(128,128,128,.62)); font-variant-numeric: tabular-nums; }
+.ccs-tag-btn:hover { background: var(--ccs-hover); }
+.ccs-tag-btn.is-on { background: var(--ccs-gold-soft); color: var(--dsw-alias-label-primary, currentColor); }
+.ccs-tag-btn:focus-visible { outline: 2px solid var(--ccs-accent); outline-offset: 1px; }
+.ccs-rail-empty { padding: 2px 8px; font-size: 11px; color: var(--dsw-alias-label-caption, rgba(128,128,128,.62)); }
+.ccs-rail-foot { margin-top: auto; padding: 10px 8px 0; border-top: 1px solid var(--ccs-line); font-size: 10.5px; line-height: 1.6; color: var(--dsw-alias-label-caption, rgba(128,128,128,.62)); }
+
+/* main */
+.ccs-main { display: flex; flex-direction: column; min-width: 0; min-height: 0; position: relative; }
+.ccs-head { display: flex; align-items: flex-end; gap: 18px; flex-wrap: wrap; padding: 20px 22px 12px; border-bottom: 1px solid var(--ccs-line); }
+.ccs-head-main { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.ccs-head-main h1 { margin: 0; font-size: 23px; line-height: 1.2; font-weight: 600; letter-spacing: -.01em; }
+.ccs-head-main p { margin: 0; font-size: 12px; color: var(--dsw-alias-label-caption, rgba(128,128,128,.62)); font-variant-numeric: tabular-nums; }
+.ccs-head-tools { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+.ccs-search input {
+  width: 250px; padding: 6px 10px; border-radius: 7px; outline: none;
+  border: 1px solid var(--ccs-line); background: var(--ccs-surface); color: inherit;
+  font: inherit; font-size: 12.5px;
+}
+.ccs-search input::placeholder { color: var(--dsw-alias-label-caption, rgba(128,128,128,.62)); }
+.ccs-search input:focus-visible { border-color: color-mix(in srgb, var(--ccs-accent) 35%, var(--ccs-line)); box-shadow: 0 0 0 3px var(--ccs-accent-soft); }
+.ccs-action {
+  appearance: none; border: 1px solid var(--ccs-line); background: var(--ccs-surface); color: var(--dsw-alias-label-secondary, rgba(128,128,128,.95));
+  padding: 4px 10px; border-radius: 7px; font: inherit; font-size: 12px; white-space: nowrap; cursor: pointer;
+}
+.ccs-action:hover { border-color: var(--ccs-line-strong); color: var(--dsw-alias-label-primary, currentColor); }
+.ccs-action:focus-visible { outline: 2px solid var(--ccs-accent); outline-offset: 1px; }
+.ccs-action:disabled { opacity: .5; cursor: default; }
+.ccs-action.is-primary { background: var(--ccs-accent); border-color: var(--ccs-accent); color: #fff; }
+.ccs-action.is-primary:hover { filter: brightness(1.06); color: #fff; }
+.ccs-action.is-danger { color: var(--dsw-alias-state-error-primary, #e5544b); border-color: color-mix(in srgb, var(--dsw-alias-state-error-primary, #e5544b) 35%, var(--ccs-line)); }
+.ccs-action.is-quiet { border-color: transparent; background: transparent; color: var(--dsw-alias-label-caption, rgba(128,128,128,.62)); }
+
+/* stats */
+.ccs-stats { display: flex; align-items: center; gap: 22px; flex-wrap: wrap; padding: 8px 22px; border-bottom: 1px solid var(--ccs-line); background: var(--ccs-soft); font-size: 11px; color: var(--dsw-alias-label-caption, rgba(128,128,128,.62)); }
+.ccs-stats b { color: var(--dsw-alias-label-primary, currentColor); font-weight: 600; font-variant-numeric: tabular-nums; margin-left: 4px; }
+
+/* notice */
+.ccs-notice { display: flex; align-items: center; gap: 10px; padding: 7px 22px; font-size: 11.5px; border-bottom: 1px solid var(--ccs-line); background: var(--ccs-soft); }
+.ccs-notice button { appearance: none; border: 0; background: transparent; color: var(--dsw-alias-label-caption, rgba(128,128,128,.62)); cursor: pointer; padding: 0 2px; font-size: 13px; line-height: 1; }
+.ccs-platform { padding: 7px 22px; font-size: 11.5px; color: var(--dsw-alias-state-warn-primary, #e5a11a); background: var(--ccs-soft); border-bottom: 1px solid var(--ccs-line); }
+
+/* list */
+.ccs-scroll { flex: 1 1 auto; overflow: auto; min-height: 0; }
+.ccs-group { display: flex; align-items: baseline; gap: 10px; padding: 18px 22px 6px; }
+.ccs-group .g-title { font-size: 13px; color: var(--dsw-alias-label-secondary, rgba(128,128,128,.95)); letter-spacing: .04em; }
+.ccs-group .g-line { flex: 1 1 auto; height: 1px; background: var(--ccs-line); }
+.ccs-group .g-count { font-size: 10px; color: var(--dsw-alias-label-caption, rgba(128,128,128,.62)); font-variant-numeric: tabular-nums; }
+
+.ccs-row {
+  display: grid; grid-template-columns: 20px 20px 74px minmax(0, 1fr) 56px 104px;
+  align-items: center; gap: 10px; padding: 10px 22px; border-bottom: 1px solid var(--ccs-line);
+  background: transparent; cursor: pointer;
+}
+.ccs-row:hover { background: var(--dsw-alias-interactive-bg-hover, rgba(128,128,128,.08)); }
+.ccs-row.is-checked { background: var(--ccs-accent-soft); box-shadow: inset 2px 0 0 var(--ccs-accent); }
+.ccs-row.is-open { background: var(--ccs-soft); }
+.ccs-row .ccs-actions { opacity: 0; transition: opacity 120ms cubic-bezier(.2,.8,.2,1); }
+.ccs-row:hover .ccs-actions, .ccs-row.is-open .ccs-actions, .ccs-row:focus-within .ccs-actions { opacity: 1; }
+
+.ccs-check { display: inline-flex; align-items: center; position: relative; }
+.ccs-check input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.ccs-check span { width: 13px; height: 13px; border-radius: 4px; border: 1px solid var(--ccs-line-strong); background: var(--ccs-surface); display: inline-block; }
+.ccs-check input:checked + span { background: var(--ccs-accent); border-color: var(--ccs-accent); }
+.ccs-check input:checked + span::after { content: ""; display: block; width: 3px; height: 6px; margin: 1px 0 0 4px; border: solid #fff; border-width: 0 1.5px 1.5px 0; transform: rotate(45deg); }
+.ccs-check input:focus-visible + span { outline: 2px solid var(--ccs-accent); outline-offset: 2px; }
+
+.ccs-star { appearance: none; border: 0; background: transparent; padding: 0; font-size: 14px; line-height: 1; color: var(--dsw-alias-label-caption, rgba(128,128,128,.62)); cursor: pointer; text-align: center; }
+.ccs-star:hover { color: var(--ccs-gold); }
+.ccs-star.is-on { color: var(--ccs-gold); }
+.ccs-star:focus-visible { outline: 2px solid var(--ccs-accent); outline-offset: 2px; border-radius: 3px; }
+
+.ccs-status { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--dsw-alias-label-caption, rgba(128,128,128,.62)); white-space: nowrap; }
+.ccs-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--dsw-alias-label-caption, rgba(128,128,128,.62)); flex: none; }
+.ccs-dot.is-live { background: var(--dsw-alias-state-success-primary, #23a55a); }
+.ccs-dot.is-warn { background: var(--dsw-alias-state-warn-primary, #e5a11a); }
+.ccs-dot.is-err { background: var(--dsw-alias-state-error-primary, #e5544b); }
+
+.ccs-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.ccs-line1 { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.ccs-name { font-size: 13.5px; line-height: 1.5; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ccs-row[data-live="1"] .ccs-name { font-weight: 550; }
+.ccs-name.is-link { text-decoration: underline dotted transparent; text-underline-offset: 3px; }
+.ccs-name.is-link:hover { text-decoration-color: var(--ccs-line-strong); }
+.ccs-chips { display: flex; gap: 4px; flex: none; }
+.ccs-chip { font-size: 10px; line-height: 15px; padding: 0 6px; border-radius: 3px; border: 1px solid var(--ccs-line); color: var(--dsw-alias-label-secondary, rgba(128,128,128,.95)); background: var(--ccs-surface); white-space: nowrap; }
+.ccs-note { display: flex; gap: 7px; align-items: baseline; min-width: 0; font-size: 11.5px; color: var(--dsw-alias-label-secondary, rgba(128,128,128,.95)); }
+.ccs-note-k { flex: none; font-size: 9.5px; letter-spacing: .1em; color: var(--ccs-gold); border-left: 2px solid var(--ccs-gold); padding-left: 5px; line-height: 1.4; }
+.ccs-note-t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ccs-meta { display: flex; gap: 8px; align-items: baseline; min-width: 0; font-size: 10.5px; color: var(--dsw-alias-label-caption, rgba(128,128,128,.62)); }
+.ccs-meta span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ccs-meta .ccs-sep { flex: none; color: var(--ccs-line-strong); }
+.ccs-time { font-size: 11px; color: var(--dsw-alias-label-caption, rgba(128,128,128,.62)); text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ccs-actions { display: flex; gap: 4px; justify-content: flex-end; }
+.ccs-actions .ccs-action { padding: 3px 9px; font-size: 11.5px; border-radius: 6px; }
+.ccs-none { font-size: 11px; color: var(--dsw-alias-label-caption, rgba(128,128,128,.62)); white-space: nowrap; }
+
+/* expanded */
+.ccs-detail { grid-column: 1 / -1; padding: 10px 0 4px 44px; cursor: default; }
+.ccs-dl { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 6px 12px; margin: 0; font-size: 11.5px; color: var(--dsw-alias-label-secondary, rgba(128,128,128,.95)); }
+.ccs-dl dt { color: var(--dsw-alias-label-caption, rgba(128,128,128,.62)); font-size: 10.5px; letter-spacing: .08em; }
+.ccs-dl dd { margin: 0; min-width: 0; word-break: break-word; }
+.ccs-detail-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+.ccs-editor { margin-top: 12px; padding: 12px; border: 1px solid var(--ccs-line); border-radius: 8px; background: var(--ccs-surface); display: flex; flex-direction: column; gap: 8px; }
+.ccs-editor-title { font-size: 10.5px; letter-spacing: .1em; color: var(--dsw-alias-label-caption, rgba(128,128,128,.62)); }
+.ccs-editor .ccs-chip { background: var(--ccs-gold-soft); border-color: color-mix(in srgb, var(--ccs-gold) 30%, var(--ccs-line)); color: var(--dsw-alias-label-primary, currentColor); }
+.ccs-chip-x { appearance: none; border: 0; background: transparent; color: inherit; cursor: pointer; padding: 0; margin-left: 4px; font-size: 11px; line-height: 1; }
+.ccs-input, .ccs-textarea { width: 100%; border: 1px solid var(--ccs-line); border-radius: 6px; background: var(--ccs-surface); color: inherit; padding: 5px 8px; font: inherit; font-size: 12px; outline: none; }
+.ccs-textarea { resize: vertical; min-height: 48px; }
+.ccs-input:focus-visible, .ccs-textarea:focus-visible { border-color: color-mix(in srgb, var(--ccs-accent) 35%, var(--ccs-line)); box-shadow: 0 0 0 3px var(--ccs-accent-soft); }
+.ccs-editor-foot { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.ccs-hint { margin-left: auto; font-size: 10.5px; color: var(--dsw-alias-label-caption, rgba(128,128,128,.62)); }
+.ccs-confirm { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 12px; padding: 10px 12px; border: 1px solid color-mix(in srgb, var(--dsw-alias-state-error-primary, #e5544b) 30%, var(--ccs-line)); border-radius: 8px; background: color-mix(in srgb, var(--dsw-alias-state-error-primary, #e5544b) 6%, transparent); }
+.ccs-confirm span { flex: 1 1 220px; font-size: 12px; line-height: 1.55; }
+.ccs-digest-wrap { margin-top: 10px; }
+
+/* empty */
+.ccs-empty { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 64px 22px; text-align: center; }
+.ccs-empty h3 { margin: 0; font-size: 18px; font-weight: 600; }
+.ccs-empty p { margin: 0; font-size: 12px; color: var(--dsw-alias-label-caption, rgba(128,128,128,.62)); }
+
+/* trash */
+.ccs-trash { padding: 16px 22px; }
+.ccs-trash-head { display: flex; align-items: baseline; gap: 10px; padding-bottom: 10px; border-bottom: 1px solid var(--ccs-line); }
+.ccs-trash-head h2 { margin: 0; font-size: 16px; font-weight: 600; }
+.ccs-trash-head p { margin: 0; font-size: 11.5px; color: var(--dsw-alias-label-caption, rgba(128,128,128,.62)); }
+.ccs-trash-head .spacer { flex: 1 1 auto; }
+.ccs-trash-row { display: grid; grid-template-columns: minmax(0, 1fr) 90px auto; gap: 12px; align-items: center; padding: 12px 2px; border-bottom: 1px solid var(--ccs-line); }
+.ccs-trash-row .ccs-name { font-size: 13px; }
+.ccs-trash-row .ccs-actions { opacity: 1; }
+.ccs-trash-confirm { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.ccs-trash-confirm span { font-size: 11px; color: var(--dsw-alias-state-error-primary, #e5544b); }
+
+/* batch bar */
+.ccs-batch { position: absolute; left: 50%; bottom: 18px; transform: translateX(-50%); display: flex; align-items: center; gap: 8px; padding: 8px 10px 8px 14px; border-radius: 10px; background: var(--ccs-surface); border: 1px solid var(--ccs-line-strong); box-shadow: 0 6px 24px rgba(15,23,42,.14); z-index: 20; font-size: 12px; }
+.ccs-batch .count { color: var(--dsw-alias-label-secondary, rgba(128,128,128,.95)); font-variant-numeric: tabular-nums; margin-right: 4px; }
+.ccs-batch .divider { width: 1px; height: 18px; background: var(--ccs-line); margin: 0 2px; }
+.ccs-batch .ccs-action { padding: 3px 9px; font-size: 11.5px; }
+
+/* merge panel */
+.ccs-merge { display: flex; flex-direction: column; gap: 6px; margin: 10px 22px 0; padding: 10px 12px; border: 1px solid var(--ccs-line); border-radius: 8px; background: var(--ccs-soft); font-size: 11.5px; }
+.ccs-merge pre { margin: 0; max-height: 220px; overflow: auto; white-space: pre-wrap; word-break: break-word; font-family: var(--dsh-font-family-code, ui-monospace, Menlo, monospace); font-size: 11.5px; line-height: 1.6; }
+
+/* narrow panels: rail becomes a top strip, favorites entry stays visible */
+.ccs-app[data-narrow="1"] { grid-template-columns: 1fr; grid-template-rows: auto minmax(0, 1fr); }
+.ccs-app[data-narrow="1"] .ccs-rail { flex-direction: row; align-items: center; gap: 12px; padding: 8px 14px; border-right: 0; border-bottom: 1px solid var(--ccs-line); overflow-x: auto; }
+.ccs-app[data-narrow="1"] .ccs-rail-head,
+.ccs-app[data-narrow="1"] .ccs-rail-foot,
+.ccs-app[data-narrow="1"] .ccs-rail-sep,
+.ccs-app[data-narrow="1"] .ccs-rail-label { display: none; }
+.ccs-app[data-narrow="1"] .ccs-views { flex-direction: row; gap: 2px; }
+.ccs-app[data-narrow="1"] .ccs-view { grid-template-columns: auto auto auto; border-left: 0; border-bottom: 2px solid transparent; border-radius: 0; padding: 3px 8px 5px; white-space: nowrap; }
+.ccs-app[data-narrow="1"] .ccs-view.is-on { background: transparent; border-bottom-color: var(--ccs-accent); }
+.ccs-app[data-narrow="1"] .ccs-taglist { flex-direction: row; gap: 4px; overflow: visible; }
+.ccs-app[data-narrow="1"] .ccs-tag-btn { padding: 2px 7px; border: 1px solid var(--ccs-line); border-radius: 999px; white-space: nowrap; }
+.ccs-app[data-narrow="1"] .ccs-head { padding: 14px 14px 10px; }
+.ccs-app[data-narrow="1"] .ccs-head-tools { width: 100%; margin-left: 0; }
+.ccs-app[data-narrow="1"] .ccs-search { flex: 1 1 160px; }
+.ccs-app[data-narrow="1"] .ccs-search input { width: 100%; min-width: 120px; }
+.ccs-app[data-narrow="1"] .ccs-stats { padding: 8px 14px; }
+.ccs-app[data-narrow="1"] .ccs-group { padding: 16px 14px 6px; }
+.ccs-app[data-narrow="1"] .ccs-row { grid-template-columns: 20px 20px minmax(0, 1fr) 52px auto; padding: 10px 14px; }
+.ccs-app[data-narrow="1"] .ccs-status { display: none; }
+.ccs-app[data-narrow="1"] .ccs-actions { opacity: 1; }
+.ccs-app[data-narrow="1"] .ccs-time { grid-column: 4; }
+.ccs-app[data-narrow="1"] .ccs-detail { padding-left: 40px; }
+.ccs-app[data-narrow="1"] .ccs-notice, .ccs-app[data-narrow="1"] .ccs-platform { padding: 7px 14px; }
+.ccs-app[data-narrow="1"] .ccs-batch { max-width: calc(100% - 20px); flex-wrap: wrap; }
+
+@media (prefers-reduced-motion: reduce) {
+  .ccs-row .ccs-actions { transition: none; }
+}
+`
+
     function PanelStyle() {
-      return h('style', { dangerouslySetInnerHTML: { __html: PANEL_CSS } })
+      return h('style', { dangerouslySetInnerHTML: { __html: PANEL_CSS + REDESIGN_CSS } })
     }
 
     function waitFor(probe, timeoutMs) {
@@ -853,13 +1080,37 @@ window.__ModuleLoader__.load({
         note: typeof meta?.note === 'string' ? meta.note : '',
       }
     }
+    function dayBucket(ms) {
+      if (!ms) return 'earlier'
+      const now = new Date()
+      const start = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
+      if (ms >= start) return 'today'
+      if (ms >= start - 86400000) return 'yesterday'
+      return 'earlier'
+    }
+
+    /** Small button used inside rows; stops row toggling and row selection clicks. */
+    function Action({ children, onClick, primary, danger, quiet, disabled, title }) {
+      return h(
+        'button',
+        {
+          type: 'button',
+          className: `ccs-action${primary ? ' is-primary' : ''}${danger ? ' is-danger' : ''}${quiet ? ' is-quiet' : ''}`,
+          disabled,
+          title,
+          onClick: (event) => {
+            event.stopPropagation()
+            if (!disabled) onClick?.()
+          },
+        },
+        children,
+      )
+    }
+
     function Row({ row, selected, onToggleSelect, onTakeOver, onOpen, onRelease, onSubagents, onMeta, onDelete, tagOptions }) {
       const [open, setOpen] = React.useState(false)
       const [busy, setBusy] = React.useState(false)
-      const [hover, setHover] = React.useState(false)
       const [showDigest, setShowDigest] = React.useState(false)
-      const [menu, setMenu] = React.useState(false)
-      const [ask, setAsk] = React.useState('')
       const [editing, setEditing] = React.useState(false)
       const [confirmDelete, setConfirmDelete] = React.useState(false)
       const [metaBusy, setMetaBusy] = React.useState(false)
@@ -870,6 +1121,7 @@ window.__ModuleLoader__.load({
       const topic = row.title || row.firstPrompt || row.preview || ''
       const title = topic || row.name || shortId(row.id)
       const meta = metaOf(row)
+      const status = statusOf(row)
 
       const run = (fork) => {
         if (busy) return
@@ -895,7 +1147,6 @@ window.__ModuleLoader__.load({
         setTagInput('')
         setOpen(true)
         setEditing(true)
-        setMenu(false)
       }
 
       const commitTag = () => {
@@ -933,525 +1184,229 @@ window.__ModuleLoader__.load({
       }
 
       return h(
-        'div',
+        'article',
         {
-          className: 'ccs-row',
-          onMouseEnter: () => setHover(true),
-          onMouseLeave: () => setHover(false),
-          style: {
-            margin: '5px 10px',
-            border: `1px solid ${selected ? ACCENT_LINE : T.line}`,
-            borderRadius: R.card,
-            background: selected ? ACCENT_SOFT : T.base,
-            boxShadow: SHADOW.card,
+          className: `ccs-row${selected ? ' is-checked' : ''}${open ? ' is-open' : ''}`,
+          'data-live': row.live ? '1' : '0',
+          onClick: (event) => {
+            if (event.target.closest('button, input, label, textarea, .ccs-detail')) return
+            setOpen((value) => !value)
           },
         },
         h(
-          'div',
+          'label',
+          { className: 'ccs-check', onClick: (event) => event.stopPropagation() },
+          h('input', { type: 'checkbox', checked: selected, onChange: () => onToggleSelect(row.id) }),
+          h('span', null),
+        ),
+        h(
+          'button',
           {
-            onClick: () => setOpen((value) => !value),
-            style: {
-              display: 'grid',
-              gridTemplateColumns: GRID,
-              alignItems: 'center',
-              gap: 10,
-              padding: '9px 12px',
-              cursor: 'pointer',
-              background: open ? T.layer1 : hover ? T.hover : 'transparent',
-              borderRadius: open ? '11px 11px 0 0' : 11,
+            type: 'button',
+            className: `ccs-star${meta.favorite ? ' is-on' : ''}`,
+            title: meta.favorite ? '取消收藏' : '收藏',
+            onClick: (event) => {
+              event.stopPropagation()
+              toggleFavorite()
             },
           },
-          h('input', {
-            type: 'checkbox',
-            checked: selected,
-            onClick: (event) => event.stopPropagation(),
-            onChange: () => onToggleSelect(row.id),
-            style: { margin: 0, cursor: 'pointer', accentColor: T.accent },
-          }),
-          h(StatusPill, { row }),
+          meta.favorite ? '★' : '☆',
+        ),
+        h(
+          'div',
+          { className: 'ccs-status' },
+          h('i', { className: `ccs-dot${status.kind === 'busy' ? ' is-live' : ''}${status.kind === 'warn' ? ' is-warn' : ''}${status.kind === 'blocked' ? ' is-err' : ''}` }),
+          status.label,
+        ),
+        h(
+          'div',
+          { className: 'ccs-body' },
           h(
             'div',
-            { style: { display: 'flex', flexDirection: 'column', gap: 1, minWidth: 0 } },
+            { className: 'ccs-line1' },
             h(
               'span',
-              { style: { display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 } },
-              h(
-                'button',
-                {
-                  type: 'button',
-                  className: 'ccs-ctl',
-                  title: meta.favorite ? '取消收藏' : '收藏',
-                  onClick: (event) => {
-                    event.stopPropagation()
-                    toggleFavorite()
-                  },
-                  style: {
-                    appearance: 'none',
-                    border: 'none',
-                    background: 'transparent',
-                    padding: 0,
-                    cursor: 'pointer',
-                    fontSize: 13,
-                    lineHeight: 1,
-                    flex: '0 0 auto',
-                    color: meta.favorite ? T.warn : T.faint,
-                  },
-                },
-                meta.favorite ? '★' : '☆',
-              ),
-              h(
-                'span',
-                {
-                  title: resumable && onOpen ? `${title} — 点击进入对话` : title,
-                  onClick:
-                    resumable && onOpen
-                      ? (event) => {
-                          event.stopPropagation()
-                          onOpen(row)
-                        }
-                      : undefined,
-                  style: {
-                    fontSize: FS,
-                    color: T.text,
-                    fontWeight: row.live ? 500 : 400,
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                    cursor: resumable && onOpen ? 'pointer' : 'default',
-                    textDecoration: resumable && onOpen ? 'underline dotted transparent' : 'none',
-                  },
-                  onMouseEnter: (event) => {
-                    if (resumable && onOpen) event.currentTarget.style.textDecorationColor = T.lineStrong
-                  },
-                  onMouseLeave: (event) => {
-                    if (resumable && onOpen) event.currentTarget.style.textDecorationColor = 'transparent'
-                  },
-                },
-                title,
-              ),
-            ),
-            h(
-              'span',
-              { style: { display: 'flex', gap: 6, alignItems: 'baseline', minWidth: 0 } },
-              h(
-                'span',
-                { style: { fontSize: 10.5, color: T.caption, fontFamily: MONO, flex: '0 0 auto' } },
-                shortId(row.id),
-              ),
-              h(
-                'span',
-                {
-                  style: {
-                    fontSize: 10.5,
-                    color: T.faint,
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                  },
-                },
-                [row.kind, row.preview].filter(Boolean).join(' · '),
-              ),
+              {
+                className: `ccs-name${resumable && onOpen ? ' is-link' : ''}`,
+                title: resumable && onOpen ? `${title} — 点击进入对话` : title,
+                onClick:
+                  resumable && onOpen
+                    ? (event) => {
+                        event.stopPropagation()
+                        onOpen(row)
+                      }
+                    : undefined,
+              },
+              title,
             ),
             meta.tags.length > 0
               ? h(
                   'span',
-                  {
-                    style: {
-                      display: 'flex',
-                      gap: 4,
-                      alignItems: 'center',
-                      minWidth: 0,
-                      overflow: 'hidden',
-                      paddingTop: 1,
-                    },
-                  },
-                  ...meta.tags.map((tag) =>
-                    h(
-                      'span',
-                      {
-                        key: `tag-${tag}`,
-                        title: `标签：${tag}`,
-                        style: {
-                          fontSize: 10.5,
-                          lineHeight: '16px',
-                          padding: '0 7px',
-                          borderRadius: R.pill,
-                          color: T.accentText,
-                          background: ACCENT_SOFT,
-                          border: `${HAIRLINE} solid ${ACCENT_LINE}`,
-                          whiteSpace: 'nowrap',
-                          flex: '0 0 auto',
-                        },
-                      },
-                      tag,
-                    ),
-                  ),
-                )
-              : null,
-            meta.note
-              ? h(
-                  'span',
-                  {
-                    title: meta.note,
-                    style: {
-                      fontSize: 11,
-                      color: T.sub,
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
-                    },
-                  },
-                  `备注：${meta.note}`,
+                  { className: 'ccs-chips' },
+                  ...meta.tags.map((tag) => h('span', { key: `tag-${tag}`, className: 'ccs-chip', title: `标签：${tag}` }, tag)),
                 )
               : null,
           ),
-          h(
-            'span',
-            {
-              title: row.cwd || '',
-              style: {
-                fontSize: FS2,
-                color: T.faint,
-                fontFamily: MONO,
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
-              },
-            },
-            shortDir(row.cwd),
-          ),
-          h(
-            'span',
-            { style: { fontSize: 11, color: T.caption, whiteSpace: 'nowrap', textAlign: 'right', ...NUM } },
-            relativeTime(row.mtime ?? row.startedAt),
-          ),
+          meta.note
+            ? h(
+                'div',
+                { className: 'ccs-note' },
+                h('span', { className: 'ccs-note-k' }, '备注'),
+                h('span', { className: 'ccs-note-t', title: meta.note }, meta.note),
+              )
+            : null,
           h(
             'div',
-            { style: { display: 'flex', gap: 6, justifyContent: 'flex-end', position: 'relative' } },
-            resumable && onOpen
-              ? h(
-                  PrimaryButton,
-                  {
-                    // PrimaryButton also stops propagation and calls onClick() with no event.
-                    onClick: () => onOpen(row),
-                    title: '在面板里看完整对话并继续',
-                  },
-                  '对话',
-                )
-              : null,
-            row.subagents > 0 && onSubagents
-              ? h(
-                  GhostButton,
-                  {
-                    onClick: () => onSubagents(row),
-                    title: `查看这个会话的 ${row.subagents} 个子代理过程`,
-                  },
-                  `子代理（${row.subagents}）`,
-                )
-              : null,
-            resumable
-              ? h(
-                  GhostButton,
-                  {
-                    onClick: () => run(!row.live),
-                    disabled: busy || row.panelOwned === true,
-                    title:
-                      row.panelOwned === true
-                        ? '面板正在使用该会话：先回面板结束（或 fork），避免两个进程写同一份转录'
-                        : row.live
-                          ? '该会话还开着，fork 一份新的最安全'
-                          : '在新终端里接着这个会话干',
-                  },
-                  row.panelOwned === true
-                    ? '面板占用'
-                    : busy
-                      ? '启动中'
-                      : row.live
-                        ? 'fork 打开'
-                        : '接管终端',
-                )
-              : h('span', { style: { fontSize: 11, color: T.faint, whiteSpace: 'nowrap' } }, '无记录'),
-            resumable
-              ? h(GhostButton, { onClick: () => setMenu((value) => !value), title: '更多操作' }, '⋯')
-              : null,
-            menu && resumable
-              ? h(
-                  'div',
-                  {
-                    onClick: (event) => event.stopPropagation(),
-                    style: {
-                      position: 'absolute',
-                      top: '100%',
-                      right: 0,
-                      marginTop: 4,
-                      zIndex: 20,
-                      minWidth: 158,
-                      display: 'flex',
-                      flexDirection: 'column',
-                      background: T.base,
-                      border: `1px solid ${T.lineStrong}`,
-                      boxShadow: '0 8px 24px rgba(0,0,0,0.18)',
-                    },
-                  },
-                  ...[
-                    {
-                      label: meta.favorite ? '取消收藏' : '收藏',
-                      run: () => { toggleFavorite(); setMenu(false) },
-                    },
-                    { label: '标签与备注…', run: openEditor },
-                    {
-                      label: showDigest ? '收起摘要' : '查看摘要',
-                      run: () => { setShowDigest((value) => !value); setMenu(false) },
-                    },
-                    { label: '复制 resume 命令', run: () => { copyText(resumeCommand(row)); setMenu(false) } },
-                    { label: '复制 fork 命令', run: () => { copyText(forkCommand(row)); setMenu(false) } },
-                    { label: open ? '收起详情' : '展开详情', run: () => { setOpen((value) => !value); setMenu(false) } },
-                    { label: '删除…', danger: true, run: () => { setConfirmDelete(true); setOpen(true); setMenu(false) } },
-                  ].map((item) =>
-                    h(
-                      'button',
-                      {
-                        key: item.label,
-                        type: 'button',
-                        className: 'ccs-ctl',
-                        onClick: (event) => { event.stopPropagation(); item.run() },
-                        onMouseEnter: (event) => { event.currentTarget.style.background = T.hover },
-                        onMouseLeave: (event) => { event.currentTarget.style.background = 'transparent' },
-                        style: {
-                          appearance: 'none',
-                          border: 'none',
-                          background: 'transparent',
-                          color: item.danger ? T.err : T.sub,
-                          fontFamily: 'inherit',
-                          fontSize: FS2,
-                          textAlign: 'left',
-                          padding: '6px 10px',
-                          cursor: 'pointer',
-                          borderBottom: `${HAIRLINE} solid ${T.line}`,
-                        },
-                      },
-                      item.label,
-                    ),
-                  ),
-                )
-              : null,
+            { className: 'ccs-meta' },
+            h('span', { className: 'ccs-mono' }, shortId(row.id)),
+            h('span', { className: 'ccs-sep' }, '·'),
+            h('span', null, row.kind || 'session'),
+            row.cwd ? h('span', { className: 'ccs-sep' }, '·') : null,
+            row.cwd ? h('span', { className: 'ccs-mono' }, shortDir(row.cwd)) : null,
           ),
+        ),
+        h('div', { className: 'ccs-time' }, relativeTime(row.mtime ?? row.startedAt)),
+        h(
+          'div',
+          { className: 'ccs-actions' },
+          resumable && onOpen ? h(Action, { primary: true, onClick: () => onOpen(row), title: '在面板里看完整对话并继续' }, '对话') : null,
+          resumable ? h(Action, { onClick: () => setOpen((value) => !value), title: '详情与更多操作' }, '⋯') : h('span', { className: 'ccs-none' }, '无记录'),
         ),
         open
           ? h(
               'div',
-              {
-                style: {
-                  padding: '10px 16px 14px 40px',
-                  background: T.layer1,
-                  borderRadius: '0 0 11px 11px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: 10,
-                },
-              },
+              { className: 'ccs-detail' },
               h(
-                'div',
-                { style: { display: 'grid', gridTemplateColumns: '84px 1fr', rowGap: 6, columnGap: 12 } },
-                h('span', { style: { fontSize: 11, color: T.caption } }, 'session'),
-                h(
-                  'span',
-                  { style: { fontSize: FS2, fontFamily: MONO, color: T.text, wordBreak: 'break-all' } },
-                  row.id,
-                ),
-                h('span', { style: { fontSize: 11, color: T.caption } }, '工作目录'),
-                h(
-                  'span',
-                  { style: { fontSize: FS2, fontFamily: MONO, color: T.sub, wordBreak: 'break-all' } },
-                  row.cwd || '—',
-                ),
-                h('span', { style: { fontSize: 11, color: T.caption } }, '最后活动'),
-                h(
-                  'span',
-                  { style: { fontSize: FS2, color: T.sub } },
-                  `${absoluteTime(row.mtime ?? row.startedAt)} · ${sizeText(row.size)}`,
-                ),
-                h('span', { style: { fontSize: 11, color: T.caption } }, '最后一问'),
-                h('span', { style: { fontSize: FS2, color: T.sub, lineHeight: 1.55 } }, row.preview || '—'),
+                'dl',
+                { className: 'ccs-dl' },
+                h('dt', null, '会话'),
+                h('dd', { className: 'ccs-mono' }, row.id),
+                h('dt', null, '工作目录'),
+                h('dd', { className: 'ccs-mono' }, row.cwd || '—'),
+                h('dt', null, '最后活动'),
+                h('dd', null, `${absoluteTime(row.mtime ?? row.startedAt)} · ${sizeText(row.size)}`),
+                h('dt', null, '最后一问'),
+                h('dd', null, row.preview || '—'),
               ),
-              row.live && row.kind === 'background'
-                ? h(
-                    'div',
-                    { style: { fontSize: 11, color: T.warn } },
-                    '这是一条后台 job 的残留记录（对话记录已清理），只能看不能接管。',
-                  )
-                : row.live
-                  ? h(
-                      'div',
-                      { style: { fontSize: 11, color: T.caption } },
-                      '该会话仍开着：直接接管会在原 sessionId 上续写（cc 无文件锁，可能双写），所以这里默认 fork。',
-                    )
-                  : null,
               h(
                 'div',
-                { style: { display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' } },
+                { className: 'ccs-detail-actions' },
+                row.subagents > 0 && onSubagents
+                  ? h(Action, { onClick: () => onSubagents(row) }, `子代理（${row.subagents}）`)
+                  : null,
+                row.panelOwned === true && onRelease
+                  ? h(Action, { onClick: () => onRelease(row) }, '结束面板会话')
+                  : null,
                 resumable
                   ? h(
-                      GhostButton,
+                      Action,
                       {
-                        onClick: () => setShowDigest((value) => !value),
+                        onClick: () => run(!row.live),
+                        disabled: busy || row.panelOwned === true,
+                        title: row.live ? '该会话还开着，fork 一份新的最安全' : '在新终端里接着这个会话干',
                       },
-                      showDigest ? '收起预览' : '预览摘要',
+                      busy ? '启动中…' : row.live ? 'fork 打开' : '接管终端',
                     )
                   : null,
-                resumable ? h(CopyButton, { label: '复制 resume 命令', value: resumeCommand(row) }) : null,
-                resumable ? h(CopyButton, { label: '复制 fork 命令', value: forkCommand(row) }) : null,
+                resumable ? h(Action, { onClick: () => copyText(resumeCommand(row)) }, '复制 resume 命令') : null,
+                resumable ? h(Action, { onClick: () => copyText(forkCommand(row)) }, '复制 fork 命令') : null,
+                h(Action, { onClick: () => setShowDigest((value) => !value) }, showDigest ? '收起摘要' : '摘要'),
+                h(Action, { onClick: openEditor }, '标签与备注'),
+                resumable
+                  ? h(
+                      Action,
+                      {
+                        danger: true,
+                        onClick: () => {
+                          setConfirmDelete(true)
+                          setOpen(true)
+                        },
+                      },
+                      '删除…',
+                    )
+                  : null,
               ),
               editing
                 ? h(
                     'div',
-                    {
-                      style: {
-                        borderTop: `${HAIRLINE} solid ${T.line}`,
-                        paddingTop: 10,
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: 8,
-                      },
-                    },
-                    h('span', { style: { fontSize: 11, color: T.caption } }, '标签与备注（只存在本机）'),
+                    { className: 'ccs-editor' },
+                    h('div', { className: 'ccs-editor-title' }, '标签与备注 · 只存在本机'),
                     h(
-                      'span',
-                      { style: { display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' } },
+                      'div',
+                      { className: 'ccs-chips' },
                       ...tagDraft.map((tag) =>
                         h(
                           'span',
-                          {
-                            key: `draft-${tag}`,
-                            style: {
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: 4,
-                              fontSize: 11,
-                              lineHeight: '18px',
-                              padding: '0 4px 0 8px',
-                              borderRadius: R.pill,
-                              color: T.accentText,
-                              background: ACCENT_SOFT,
-                              border: `${HAIRLINE} solid ${ACCENT_LINE}`,
-                            },
-                          },
+                          { key: `draft-${tag}`, className: 'ccs-chip' },
                           tag,
                           h(
                             'button',
                             {
                               type: 'button',
+                              className: 'ccs-chip-x',
                               title: '移除',
-                              onClick: () => setTagDraft((list) => list.filter((item) => item !== tag)),
-                              style: {
-                                appearance: 'none',
-                                border: 'none',
-                                background: 'transparent',
-                                color: 'inherit',
-                                cursor: 'pointer',
-                                padding: 0,
-                                fontSize: 12,
-                                lineHeight: 1,
+                              onClick: (event) => {
+                                event.stopPropagation()
+                                setTagDraft((list) => list.filter((item) => item !== tag))
                               },
                             },
                             '×',
                           ),
                         ),
                       ),
-                      h('input', {
-                        value: tagInput,
-                        list: `ccs-tags-${row.id}`,
-                        placeholder: tagDraft.length >= 12 ? '已达 12 个上限' : '加标签（回车确认，保存时也会收下）',
-                        onChange: (event) => setTagInput(event.target.value),
-                        onBlur: commitTag,
-                        onKeyDown: (event) => {
-                          if (event.key === 'Enter') {
-                            event.preventDefault()
-                            commitTag()
-                          }
-                        },
-                        style: {
-                          boxSizing: 'border-box',
-                          width: 150,
-                          padding: '3px 8px',
-                          fontSize: FS2,
-                          color: T.text,
-                          background: T.base,
-                          border: `${HAIRLINE} solid ${T.line}`,
-                          borderRadius: 6,
-                          outline: 'none',
-                          fontFamily: 'inherit',
-                        },
-                      }),
-                      h(
-                        'datalist',
-                        { id: `ccs-tags-${row.id}` },
-                        ...(tagOptions || [])
-                          .filter((tag) => !tagDraft.includes(tag))
-                          .map((tag) => h('option', { key: `opt-${tag}`, value: tag })),
-                      ),
+                    ),
+                    h('input', {
+                      className: 'ccs-input',
+                      value: tagInput,
+                      list: `ccs-tags-${row.id}`,
+                      placeholder: tagDraft.length >= 12 ? '已达 12 个上限' : '加标签（回车确认，保存时也会收下）',
+                      onChange: (event) => setTagInput(event.target.value),
+                      onBlur: commitTag,
+                      onClick: (event) => event.stopPropagation(),
+                      onKeyDown: (event) => {
+                        if (event.key === 'Enter') {
+                          event.preventDefault()
+                          commitTag()
+                        }
+                      },
+                    }),
+                    h(
+                      'datalist',
+                      { id: `ccs-tags-${row.id}` },
+                      ...(tagOptions || [])
+                        .filter((tag) => !tagDraft.includes(tag))
+                        .map((tag) => h('option', { key: `opt-${tag}`, value: tag })),
                     ),
                     h('textarea', {
+                      className: 'ccs-textarea',
                       value: noteDraft,
                       rows: 2,
                       maxLength: 500,
                       placeholder: '备注：为什么留着它／下次从哪接着做（只在列表里给自己看）',
                       onChange: (event) => setNoteDraft(event.target.value),
-                      style: {
-                        boxSizing: 'border-box',
-                        width: '100%',
-                        resize: 'vertical',
-                        padding: '6px 8px',
-                        fontSize: FS2,
-                        lineHeight: 1.55,
-                        color: T.text,
-                        background: T.base,
-                        border: `${HAIRLINE} solid ${T.line}`,
-                        borderRadius: 6,
-                        outline: 'none',
-                        fontFamily: 'inherit',
-                      },
+                      onClick: (event) => event.stopPropagation(),
                     }),
                     h(
                       'div',
-                      { style: { display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' } },
-                      h(GhostButton, { onClick: saveEditor, disabled: metaBusy, tone: T.accentText }, metaBusy ? '保存中…' : '保存'),
-                      h(GhostButton, { onClick: () => setEditing(false) }, '取消'),
-                      h(
-                        'span',
-                        { style: { fontSize: 10.5, color: T.caption } },
-                        `${tagDraft.length}/12 个标签 · 备注 ${noteDraft.length}/500`,
-                      ),
+                      { className: 'ccs-editor-foot' },
+                      h(Action, { primary: true, onClick: saveEditor, disabled: metaBusy }, metaBusy ? '保存中…' : '保存'),
+                      h(Action, { onClick: () => setEditing(false) }, '取消'),
+                      h('span', { className: 'ccs-hint' }, `${tagDraft.length}/12 个标签 · 备注 ${noteDraft.length}/500`),
                     ),
                   )
                 : null,
               confirmDelete
                 ? h(
                     'div',
-                    {
-                      style: {
-                        borderTop: `${HAIRLINE} solid ${T.line}`,
-                        paddingTop: 10,
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 8,
-                        flexWrap: 'wrap',
-                      },
-                    },
-                    h(
-                      'span',
-                      { style: { flex: '1 1 220px', fontSize: FS2, color: T.text, lineHeight: 1.55 } },
-                      `删除「${title}」？转录、子代理过程、文件历史会移进回收站，可在「回收站」恢复。`,
-                    ),
-                    h(GhostButton, { onClick: removeRow, disabled: metaBusy, tone: T.err }, metaBusy ? '处理中…' : '移入回收站'),
-                    h(GhostButton, { onClick: () => setConfirmDelete(false) }, '取消'),
+                    { className: 'ccs-confirm' },
+                    h('span', null, `删除「${title}」？转录、子代理过程、文件历史会移进回收站，可在「回收站」恢复。`),
+                    h(Action, { danger: true, onClick: removeRow, disabled: metaBusy }, metaBusy ? '处理中…' : '移入回收站'),
+                    h(Action, { onClick: () => setConfirmDelete(false) }, '取消'),
                   )
                 : null,
+              showDigest ? h('div', { className: 'ccs-digest-wrap' }, h(DigestView, { row })) : null,
             )
           : null,
-        // 摘要独立挂载：以前它在 `open` 分支内，菜单点「查看摘要」只改了状态、
-        // 详情没展开就什么都不显示（2026-11-09 修）。
-        showDigest ? h('div', { style: { padding: '2px 16px 12px 40px' } }, h(DigestView, { row })) : null,
       )
     }
 
@@ -1461,53 +1416,35 @@ window.__ModuleLoader__.load({
       const title = entry.title || shortId(entry.id)
       return h(
         'div',
-        {
-          className: 'ccs-row',
-          style: {
-            margin: '5px 10px',
-            border: `1px solid ${T.line}`,
-            borderRadius: R.card,
-            background: T.base,
-            boxShadow: SHADOW.card,
-            padding: '9px 12px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 12,
-            flexWrap: 'wrap',
-          },
-        },
+        { className: 'ccs-trash-row' },
         h(
           'div',
-          { style: { display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0, flex: '1 1 260px' } },
+          { style: { minWidth: 0 } },
+          h('div', { className: 'ccs-name', title }, title),
           h(
-            'span',
-            { style: { fontSize: FS, color: T.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } },
-            title,
-          ),
-          h(
-            'span',
-            { style: { fontSize: 10.5, color: T.caption, fontFamily: MONO } },
-            [shortId(entry.id), entry.project, sizeText(entry.size)].filter(Boolean).join(' · '),
-          ),
-          h(
-            'span',
-            { style: { fontSize: 10.5, color: T.faint, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } },
-            `${Number.isFinite(stamp) ? absoluteTime(stamp) : entry.deletedAt} · ${entry.cwd || '—'}`,
+            'div',
+            { className: 'ccs-meta' },
+            h('span', { className: 'ccs-mono' }, shortId(entry.id)),
+            h('span', { className: 'ccs-sep' }, '·'),
+            h('span', null, sizeText(entry.size)),
+            entry.project ? h('span', { className: 'ccs-sep' }, '·') : null,
+            entry.project ? h('span', { className: 'ccs-mono' }, entry.project) : null,
           ),
         ),
+        h('div', { className: 'ccs-time' }, Number.isFinite(stamp) ? absoluteTime(stamp) : String(entry.deletedAt || '')),
         confirming
           ? h(
               'div',
-              { style: { display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' } },
-              h('span', { style: { fontSize: 11, color: T.err } }, '彻底删除后无法恢复'),
-              h(GhostButton, { onClick: onPurge, disabled: busy, tone: T.err }, busy ? '删除中…' : '确认彻底删除'),
-              h(GhostButton, { onClick: onCancel, disabled: busy }, '取消'),
+              { className: 'ccs-trash-confirm' },
+              h('span', null, '彻底删除后无法恢复'),
+              h(Action, { danger: true, onClick: onPurge, disabled: busy }, busy ? '删除中…' : '确认彻底删除'),
+              h(Action, { onClick: onCancel, disabled: busy }, '取消'),
             )
           : h(
               'div',
-              { style: { display: 'flex', alignItems: 'center', gap: 6 } },
-              h(GhostButton, { onClick: onRestore, disabled: busy }, busy ? '恢复中…' : '恢复'),
-              h(GhostButton, { onClick: onConfirm, disabled: busy, tone: T.err }, '彻底删除'),
+              { className: 'ccs-actions' },
+              h(Action, { onClick: onRestore, disabled: busy }, busy ? '恢复中…' : '恢复'),
+              h(Action, { danger: true, onClick: onConfirm, disabled: busy }, '彻底删除'),
             ),
       )
     }
@@ -4208,6 +4145,9 @@ window.__ModuleLoader__.load({
       const [trashConfirm, setTrashConfirm] = React.useState(null)
       const [batchTag, setBatchTag] = React.useState({ open: false, value: '' })
       const [batchDelete, setBatchDelete] = React.useState(false)
+      const [tagFilter, setTagFilter] = React.useState(null)
+      const [narrow, setNarrow] = React.useState(false)
+      const shellRef = React.useRef(null)
 
       const load = React.useCallback(() => {
         setLoading(true)
@@ -4236,6 +4176,19 @@ window.__ModuleLoader__.load({
         const timer = setTimeout(() => setNotice(null), notice.tone === T.err ? 8000 : 4000)
         return () => clearTimeout(timer)
       }, [notice])
+
+      // The panel can be wide or a narrow side slot; the rail becomes a top strip
+      // under 860px so the favorites entry never falls off-screen.
+      React.useEffect(() => {
+        const node = shellRef.current
+        if (!node || typeof ResizeObserver === 'undefined') return undefined
+        const observer = new ResizeObserver((entries) => {
+          const width = entries[0]?.contentRect?.width ?? 0
+          setNarrow(width > 0 && width < 860)
+        })
+        observer.observe(node)
+        return () => observer.disconnect()
+      }, [chat, trashView])
 
       // Chat is a host-side opt-out; the UI follows whatever the host reports.
       React.useEffect(() => {
@@ -4295,7 +4248,7 @@ window.__ModuleLoader__.load({
       const archived = all.filter((row) => !row.live)
 
       const rows = React.useMemo(() => {
-        const base =
+        let base =
           filter === 'live'
             ? liveRows
             : filter === 'archived'
@@ -4303,6 +4256,7 @@ window.__ModuleLoader__.load({
               : filter === 'favorite'
                 ? all.filter((row) => metaOf(row).favorite)
                 : all
+        if (tagFilter) base = base.filter((row) => metaOf(row).tags.includes(tagFilter))
         const needle = query.trim().toLowerCase()
         if (!needle) return base
         return base.filter((row) =>
@@ -4321,7 +4275,33 @@ window.__ModuleLoader__.load({
             .filter(Boolean)
             .some((field) => String(field).toLowerCase().includes(needle)),
         )
-      }, [all, filter, query])
+      }, [all, filter, query, tagFilter])
+
+      const tagCounts = React.useMemo(() => {
+        const counts = new Map()
+        for (const row of all) {
+          for (const tag of metaOf(row).tags) counts.set(tag, (counts.get(tag) ?? 0) + 1)
+        }
+        return [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'zh'))
+      }, [all])
+
+      const groups = React.useMemo(() => {
+        const out = []
+        let current = null
+        for (const row of rows) {
+          const bucket = row.live ? 'online' : dayBucket(row.mtime ?? row.startedAt)
+          if (!current || current.key !== bucket) {
+            current = {
+              key: bucket,
+              label: bucket === 'online' ? '在线' : bucket === 'today' ? '今天' : bucket === 'yesterday' ? '昨天' : '更早',
+              rows: [],
+            }
+            out.push(current)
+          }
+          current.rows.push(row)
+        }
+        return out
+      }, [rows])
 
       const [mergeState, setMergeState] = React.useState({ status: 'idle' })
 
@@ -4349,6 +4329,25 @@ window.__ModuleLoader__.load({
         setSelected([])
         setBatchDelete(false)
         setBatchTag({ open: false, value: '' })
+      }
+
+      const chooseView = (key) => {
+        setTagFilter(null)
+        clearSelect()
+        if (key === 'trash') {
+          setTrashView(true)
+          loadTrash()
+          return
+        }
+        setTrashView(false)
+        setFilter(key)
+      }
+
+      const chooseTag = (tag) => {
+        setTagFilter((previous) => (previous === tag ? null : tag))
+        setTrashView(false)
+        setFilter('all')
+        clearSelect()
       }
 
       /** Patch rows in place instead of re-fetching: marks are tiny and the list keeps its expanded rows. */
@@ -4542,469 +4541,315 @@ window.__ModuleLoader__.load({
         return h(ChatView, { key: chat.id, target: chat, onBack: () => setChat(null) })
       }
 
+      const viewKey = trashView ? 'trash' : filter
+      const viewTitle = trashView
+        ? '回收站'
+        : tagFilter
+          ? `标签 · ${tagFilter}`
+          : filter === 'favorite'
+            ? '收藏'
+            : filter === 'live'
+              ? '在线'
+              : filter === 'archived'
+                ? '历史'
+                : '全部会话'
+      const viewSub = trashView
+        ? '删除的会话可在这里恢复或彻底删除'
+        : tagFilter
+          ? `${rows.length} 个会话带「${tagFilter}」标签`
+          : filter === 'favorite'
+            ? `${rows.length} 个会话 · 点行首 ★ 取消收藏`
+            : `${rows.length} 个会话`
+      const favoriteCount = all.filter((row) => metaOf(row).favorite).length
+      const views = [
+        { key: 'favorite', icon: '★', label: '收藏', count: favoriteCount },
+        { key: 'all', icon: '≡', label: '全部', count: all.length },
+        { key: 'live', icon: '●', label: '在线', count: liveRows.length },
+        { key: 'archived', icon: '○', label: '历史', count: archived.length },
+        { key: 'trash', icon: '⌫', label: '回收站', count: trashEntries ? trashEntries.length : null },
+      ]
+      const emptyTitle = filter === 'favorite' && !tagFilter ? '还没有收藏的会话' : '没有匹配的会话'
+      const emptyHint =
+        filter === 'favorite' && !tagFilter ? '点行首的 ☆ 收藏；收藏后会统一出现在这里。' : '换个筛选条件，或清空搜索词'
+
       return h(
         'div',
-        {
-          style: {
-            height: '100%',
-            position: 'relative',
-            display: 'flex',
-            flexDirection: 'column',
-            color: T.text,
-            fontSize: FS,
-            fontFamily: FONT,
-            background: T.base,
-          },
-        },
+        { className: 'ccs-shell', ref: shellRef },
         h(PanelStyle, null),
-        platformWarning
-          ? h(
-              'div',
-              {
-                style: {
-                  padding: '7px 16px',
-                  fontSize: 11.5,
-                  color: T.warn,
-                  background: T.layer1,
-                  borderBottom: `${HAIRLINE} solid ${T.line}`,
-                },
-              },
-              platformWarning,
-            )
-          : null,
+        platformWarning ? h('div', { className: 'ccs-platform' }, platformWarning) : null,
         h(
           'div',
-          {
-            style: {
-              padding: '18px 18px 14px',
-              // Entry pages start below the macOS titlebar (traffic lights + seat).
-              paddingTop: 'calc(18px + var(--dsh-frame-top-clearance, 0px))',
-              borderBottom: `1px solid ${T.line}`,
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 12,
-            },
-          },
+          { className: 'ccs-app', 'data-narrow': narrow ? '1' : '0' },
           h(
-            'div',
-            { style: { display: 'flex', alignItems: 'flex-start', gap: 12 } },
+            'aside',
+            { className: 'ccs-rail' },
             h(
               'div',
-              { style: { display: 'flex', flexDirection: 'column', gap: 2 } },
-              h('span', { style: { fontSize: 17, fontWeight: 650, letterSpacing: '-0.02em' } }, 'CC sessions'),
-              h(
-                'span',
-                { style: { fontSize: 11, color: T.caption } },
-                data ? `数据源 ${data.liveSource} · 更新于 ${new Date(data.generatedAt).toLocaleTimeString()}` : '正在读取…',
+              { className: 'ccs-rail-head' },
+              h('h2', { className: 'ccs-serif' }, '会话'),
+              h('span', null, `${recordedTotal ?? all.length} 个转录 · ${liveRows.length} 个在线`),
+            ),
+            h(
+              'nav',
+              { className: 'ccs-views' },
+              ...views.map((view) =>
+                h(
+                  'button',
+                  {
+                    key: view.key,
+                    type: 'button',
+                    className: `ccs-view${viewKey === view.key ? ' is-on' : ''}`,
+                    onClick: () => chooseView(view.key),
+                    title: view.key === 'trash' ? '删除的会话可恢复或彻底删除' : undefined,
+                  },
+                  h('span', { className: 'vi' }, view.icon),
+                  h('span', { className: 'vl' }, view.label),
+                  view.count === null || view.count === undefined ? null : h('span', { className: 'vc' }, view.count),
+                ),
               ),
             ),
-            h('span', { style: { flex: '1 1 auto' } }),
-            chatEnabled ? h(GhostButton, { onClick: openDraft }, '＋ 新会话') : null,
-            recordedTotal && recordedTotal > all.length
-              ? h(GhostButton, { onClick: () => setLimit((value) => value + 200), disabled: loading }, '加载更多')
-              : null,
+            h('div', { className: 'ccs-rail-sep' }),
+            h('div', { className: 'ccs-rail-label' }, '标签'),
+            tagCounts.length === 0
+              ? h('div', { className: 'ccs-rail-empty' }, '还没有标签')
+              : h(
+                  'div',
+                  { className: 'ccs-taglist' },
+                  ...tagCounts.map(([tag, count]) =>
+                    h(
+                      'button',
+                      {
+                        key: tag,
+                        type: 'button',
+                        className: `ccs-tag-btn${tagFilter === tag ? ' is-on' : ''}`,
+                        onClick: () => chooseTag(tag),
+                      },
+                      tag,
+                      h('span', null, count),
+                    ),
+                  ),
+                ),
             h(
-              GhostButton,
-              {
-                onClick: () => {
-                  const next = !trashView
-                  setTrashView(next)
-                  if (next) {
-                    loadTrash()
-                    clearSelect()
-                  }
-                },
-                title: '删除的会话移到这里，可恢复或彻底删除',
-              },
-              trashView ? '返回会话' : '回收站',
+              'div',
+              { className: 'ccs-rail-foot' },
+              data ? `数据源 ${data.liveSource}` : '正在读取…',
+              h('br'),
+              data ? `更新于 ${new Date(data.generatedAt).toLocaleTimeString()}` : '',
             ),
-            h(GhostButton, { onClick: load, disabled: loading }, loading ? '刷新中…' : '刷新'),
           ),
           h(
-            'div',
-            { style: { display: 'flex', alignItems: 'flex-end', gap: 24 } },
-            h(Stat, { label: '在线', value: liveRows.length, tone: liveRows.length ? T.ok : T.text }),
-            h(Stat, { label: '可接管', value: all.filter((row) => row.path).length }),
-            h(Stat, { label: '归档', value: recordedTotal ?? archived.length }),
-            h(Stat, { label: '本页打开', value: OPENED.size }),
-            recordedTotal
+            'main',
+            { className: 'ccs-main' },
+            h(
+              'header',
+              { className: 'ccs-head' },
+              h(
+                'div',
+                { className: 'ccs-head-main' },
+                h('h1', { className: 'ccs-serif' }, viewTitle),
+                h('p', null, viewSub),
+              ),
+              h(
+                'div',
+                { className: 'ccs-head-tools' },
+                h(
+                  'label',
+                  { className: 'ccs-search' },
+                  h('input', {
+                    value: query,
+                    onChange: (event) => setQuery(event.target.value),
+                    placeholder: '搜索会话 / 路径 / 标签 / 备注',
+                  }),
+                ),
+                recordedTotal && recordedTotal > all.length
+                  ? h(Action, { onClick: () => setLimit((value) => value + 200), disabled: loading }, '加载更多')
+                  : null,
+                h(Action, { onClick: load, disabled: loading }, loading ? '刷新中…' : '刷新'),
+                chatEnabled ? h(Action, { primary: true, onClick: openDraft }, '＋ 新会话') : null,
+              ),
+            ),
+            h(
+              'div',
+              { className: 'ccs-stats' },
+              h('span', null, '在线', h('b', null, liveRows.length)),
+              h('span', null, '可接管', h('b', null, all.filter((row) => row.path).length)),
+              h('span', null, '转录', h('b', null, recordedTotal ?? all.length)),
+              h('span', null, '收藏', h('b', null, favoriteCount)),
+            ),
+            notice
               ? h(
-                  'span',
-                  { style: { fontSize: 10.5, color: T.caption, alignSelf: 'flex-end', paddingBottom: 2 } },
-                  recordedTotal > all.length
-                    ? `已载 ${all.length} / 共 ${recordedTotal} 个转录`
-                    : `共 ${recordedTotal} 个转录`,
+                  'div',
+                  { className: 'ccs-notice' },
+                  h('span', { style: { flex: '1 1 auto', color: notice.tone } }, notice.text),
+                  h('button', { type: 'button', title: '关闭提示', onClick: () => setNotice(null) }, '×'),
+                )
+              : null,
+            error ? h('div', { className: 'ccs-notice', style: { color: T.err } }, `读取失败：${error}`) : null,
+            mergeState.status === 'running'
+              ? h('div', { className: 'ccs-merge' }, `正在合并 ${mergeState.count} 个会话的上下文…`)
+              : null,
+            mergeState.status === 'error'
+              ? h('div', { className: 'ccs-merge', style: { color: T.err } }, `合并失败：${mergeState.message}`)
+              : null,
+            mergeState.status === 'ready'
+              ? h(
+                  'div',
+                  { className: 'ccs-merge' },
+                  h(
+                    'div',
+                    { style: { display: 'flex', alignItems: 'center', gap: 8 } },
+                    h('span', { style: { fontWeight: 600 } }, `合并摘要 · ${mergeState.payload.parts.length} 个会话 · ${mergeState.payload.text.length} 字`),
+                    h('span', { style: { flex: '1 1 auto' } }),
+                    h(CopyButton, { label: '复制全部', value: mergeState.payload.text }),
+                    h(Action, { onClick: () => setMergeState({ status: 'idle' }) }, '收起'),
+                  ),
+                  h('pre', null, mergeState.payload.text),
+                )
+              : null,
+            h(
+              'div',
+              { className: 'ccs-scroll' },
+              trashView
+                ? h(
+                    'div',
+                    { className: 'ccs-trash' },
+                    h(
+                      'div',
+                      { className: 'ccs-trash-head' },
+                      h('h2', { className: 'ccs-serif' }, '回收站'),
+                      h('p', null, '删除的会话在这里，恢复会放回原位置'),
+                      h('span', { className: 'spacer' }),
+                      h(Action, { onClick: loadTrash, disabled: trashBusy === 'load' }, trashBusy === 'load' ? '读取中…' : '刷新'),
+                    ),
+                    trashError ? h('div', { className: 'ccs-notice', style: { color: T.err } }, `读取失败：${trashError}`) : null,
+                    !trashEntries
+                      ? h(SkeletonRows, null)
+                      : trashEntries.length === 0
+                        ? h(
+                            'div',
+                            { className: 'ccs-empty' },
+                            h('h3', { className: 'ccs-serif' }, '回收站是空的'),
+                            h('p', null, '删除的会话会出现在这里，可恢复或彻底删除'),
+                          )
+                        : trashEntries.map((entry) =>
+                            h(TrashRow, {
+                              key: entry.entry,
+                              entry,
+                              busy: trashBusy === entry.entry || trashBusy === 'load',
+                              confirming: trashConfirm === entry.entry,
+                              onRestore: () => restoreEntry(entry),
+                              onPurge: () => purgeEntry(entry),
+                              onConfirm: () => setTrashConfirm(entry.entry),
+                              onCancel: () => setTrashConfirm(null),
+                            }),
+                          ),
+                  )
+                : loading && !data
+                  ? h(SkeletonRows, null)
+                  : groups.length === 0
+                    ? h(
+                        'div',
+                        { className: 'ccs-empty' },
+                        h('h3', { className: 'ccs-serif' }, emptyTitle),
+                        h('p', null, emptyHint),
+                      )
+                    : groups.map((group) =>
+                        h(
+                          React.Fragment,
+                          { key: group.key },
+                          h(
+                            'div',
+                            { className: 'ccs-group' },
+                            h('span', { className: 'g-title ccs-serif' }, group.label),
+                            h('span', { className: 'g-line' }),
+                            h('span', { className: 'g-count' }, group.rows.length),
+                          ),
+                          ...group.rows.map((row) =>
+                            h(Row, {
+                              key: row.id,
+                              row,
+                              selected: selected.includes(row.id),
+                              onToggleSelect: toggleSelect,
+                              onTakeOver,
+                              onRelease: releaseSession,
+                              onOpen: chatEnabled ? openChat : undefined,
+                              onSubagents: chatEnabled ? openSubagents : undefined,
+                              onMeta: runMeta,
+                              onDelete: deleteOne,
+                              tagOptions: data?.tags ?? [],
+                            }),
+                          ),
+                        ),
+                      ),
+            ),
+            !trashView && selectedRows.length > 0
+              ? h(
+                  'div',
+                  { className: 'ccs-batch' },
+                  ...(batchDelete
+                    ? [
+                        h('span', { key: 'text', style: { color: T.err } }, '确认移进回收站？'),
+                        h(Action, { key: 'ok', danger: true, onClick: deleteSelected, disabled: loading }, '确认移入'),
+                        h(Action, { key: 'no', onClick: () => setBatchDelete(false) }, '取消'),
+                      ]
+                    : batchTag.open
+                      ? [
+                          h('input', {
+                            key: 'tag',
+                            className: 'ccs-input',
+                            style: { width: 150 },
+                            autoFocus: true,
+                            value: batchTag.value,
+                            placeholder: '标签名，回车确认',
+                            onChange: (event) => setBatchTag({ open: true, value: event.target.value }),
+                            onKeyDown: (event) => {
+                              if (event.key === 'Enter') {
+                                event.preventDefault()
+                                addBatchTag()
+                              }
+                            },
+                          }),
+                          h(Action, { key: 'ok', primary: true, onClick: addBatchTag }, '确定'),
+                          h(Action, { key: 'no', onClick: () => setBatchTag({ open: false, value: '' }) }, '取消'),
+                        ]
+                      : [
+                          h('span', { key: 'count', className: 'count' }, `已选 ${selectedRows.length} 个会话`),
+                          h('span', { key: 'd1', className: 'divider' }),
+                          h(
+                            Action,
+                            { key: 'fav', onClick: toggleBatchFavorite },
+                            selectedRows.every((row) => metaOf(row).favorite) ? '取消收藏' : '收藏',
+                          ),
+                          h(Action, { key: 'tag', onClick: () => setBatchTag({ open: true, value: '' }) }, '加标签'),
+                          h(
+                            Action,
+                            {
+                              key: 'team',
+                              primary: true,
+                              onClick: () => {
+                                if (selectedRows.length > 6) return
+                                setNotice({ text: '正在建队…', tone: T.sub })
+                                startTeamConversation(selectedRows).then((result) => {
+                                  setNotice({ text: result.message, tone: result.ok ? T.ok : T.err })
+                                })
+                              },
+                              disabled: selectedRows.length > 6,
+                              title: selectedRows.length > 6 ? '一次最多 6 个会话' : '开一条新对话，把这几份上下文交给 dsh 主 agent',
+                            },
+                            '建队开新对话',
+                          ),
+                          h(
+                            Action,
+                            { key: 'merge', onClick: () => runMerge(selectedRows), disabled: mergeState.status === 'running' },
+                            mergeState.status === 'running' ? '合并中…' : '只看摘要',
+                          ),
+                          h(Action, { key: 'del', danger: true, onClick: () => setBatchDelete(true) }, '删除…'),
+                          h('span', { key: 'd2', className: 'divider' }),
+                          h(Action, { key: 'clear', onClick: clearSelect }, '清空'),
+                        ]),
                 )
               : null,
           ),
-          h(
-            'div',
-            { style: { display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' } },
-            h(Segmented, {
-              value: filter,
-              onChange: setFilter,
-              options: [
-                { key: 'all', label: '全部', count: all.length },
-                { key: 'live', label: '在线', count: liveRows.length },
-                { key: 'archived', label: '历史', count: archived.length },
-                { key: 'favorite', label: '收藏', count: all.filter((row) => metaOf(row).favorite).length },
-              ],
-            }),
-            h('input', {
-              value: query,
-              onChange: (event) => setQuery(event.target.value),
-              placeholder: '搜索会话 / 路径 / 内容',
-              style: {
-                flex: '1 1 180px',
-                minWidth: 140,
-                boxSizing: 'border-box',
-                padding: '4px 10px',
-                fontSize: FS2,
-                lineHeight: '20px',
-                color: T.text,
-                background: T.layer1,
-                border: `${HAIRLINE} solid ${T.line}`,
-                borderRadius: 8,
-                outline: 'none',
-                fontFamily: 'inherit',
-              },
-            }),
-          ),
-        ),
-        !trashView && selectedRows.length > 0
-          ? h(
-              'div',
-              {
-                style: {
-                  margin: '12px 16px 0',
-                  padding: '8px 12px',
-                  borderRadius: R.card,
-                  border: `${HAIRLINE} solid ${T.accent}`,
-                  background: T.card,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 8,
-                  flexWrap: 'wrap',
-                },
-              },
-              h(
-                'span',
-                { style: { fontSize: FS2, color: T.text, fontWeight: 500 } },
-                `已选 ${selectedRows.length} 个会话`,
-              ),
-              h('span', { style: { flex: '1 1 auto' } }),
-              ...(batchDelete
-                ? [
-                    h(
-                      'span',
-                      { key: 'confirm-text', style: { fontSize: FS2, color: T.err } },
-                      '确认移进回收站？转录与子代理过程都能恢复',
-                    ),
-                    h(
-                      GhostButton,
-                      { key: 'confirm', onClick: deleteSelected, tone: T.err, disabled: loading },
-                      '确认移入回收站',
-                    ),
-                    h(GhostButton, { key: 'cancel', onClick: () => setBatchDelete(false) }, '取消'),
-                  ]
-                : batchTag.open
-                  ? [
-                      h('input', {
-                        key: 'tag-input',
-                        autoFocus: true,
-                        value: batchTag.value,
-                        placeholder: '标签名，回车确认',
-                        onChange: (event) => setBatchTag({ open: true, value: event.target.value }),
-                        onKeyDown: (event) => {
-                          if (event.key === 'Enter') {
-                            event.preventDefault()
-                            addBatchTag()
-                          }
-                        },
-                        style: {
-                          boxSizing: 'border-box',
-                          width: 150,
-                          padding: '3px 8px',
-                          fontSize: FS2,
-                          color: T.text,
-                          background: T.base,
-                          border: `${HAIRLINE} solid ${T.line}`,
-                          borderRadius: 6,
-                          outline: 'none',
-                          fontFamily: 'inherit',
-                        },
-                      }),
-                      h(GhostButton, { key: 'tag-ok', onClick: addBatchTag }, '确定'),
-                      h(GhostButton, { key: 'tag-cancel', onClick: () => setBatchTag({ open: false, value: '' }) }, '取消'),
-                    ]
-                  : [
-                      h(
-                        GhostButton,
-                        { key: 'favorite', onClick: toggleBatchFavorite },
-                        selectedRows.every((row) => metaOf(row).favorite) ? '取消收藏' : '收藏',
-                      ),
-                      h(
-                        GhostButton,
-                        { key: 'tag', onClick: () => setBatchTag({ open: true, value: '' }) },
-                        '加标签',
-                      ),
-                      h(
-                        PrimaryButton,
-                        {
-                          key: 'team',
-                          onClick: () => {
-                            if (selectedRows.length > 6) return
-                            setNotice({ text: '正在建队…', tone: T.sub })
-                            startTeamConversation(selectedRows).then((result) => {
-                              setNotice({ text: result.message, tone: result.ok ? T.ok : T.err })
-                            })
-                          },
-                          disabled: selectedRows.length > 6,
-                          title: selectedRows.length > 6 ? '一次最多 6 个会话' : '开一条新对话，把这几份上下文交给 dsh 主 agent',
-                        },
-                        '建队开新对话',
-                      ),
-                      h(
-                        GhostButton,
-                        { key: 'merge', onClick: () => runMerge(selectedRows), disabled: mergeState.status === 'running' },
-                        mergeState.status === 'running' ? '合并中…' : '只看合并摘要',
-                      ),
-                      h(
-                        GhostButton,
-                        { key: 'delete', onClick: () => setBatchDelete(true), tone: T.err },
-                        '删除…',
-                      ),
-                      h(GhostButton, { key: 'clear', onClick: clearSelect }, '清空'),
-                    ]),
-            )
-          : null,
-        mergeState.status === 'running'
-          ? h(
-              'div',
-              { style: { margin: '12px 16px 0', fontSize: 11.5, color: T.caption } },
-              `正在合并 ${mergeState.count} 个会话的上下文…`,
-            )
-          : null,
-        mergeState.status === 'error'
-          ? h(
-              'div',
-              { style: { margin: '12px 16px 0', fontSize: 11.5, color: T.err } },
-              `合并失败：${mergeState.message}`,
-            )
-          : null,
-        mergeState.status === 'ready'
-          ? h(
-              'div',
-              {
-                style: {
-                  margin: '12px 16px 0',
-                  border: `${HAIRLINE} solid ${T.cardStroke}`,
-                  borderRadius: R.card,
-                  background: T.card,
-                  padding: '10px 12px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: 6,
-                  maxHeight: 240,
-                  overflowY: 'auto',
-                },
-              },
-              h(
-                'div',
-                { style: { display: 'flex', alignItems: 'center', gap: 8 } },
-                h(
-                  'span',
-                  { style: { fontSize: FS2, fontWeight: 600, color: T.text } },
-                  `合并摘要 · ${mergeState.payload.parts.length} 个会话 · ${mergeState.payload.text.length} 字`,
-                ),
-                h('span', { style: { flex: '1 1 auto' } }),
-                h(CopyButton, { label: '复制全部', value: mergeState.payload.text }),
-                h(GhostButton, { onClick: () => setMergeState({ status: 'idle' }) }, '收起'),
-              ),
-              h(
-                'pre',
-                {
-                  style: {
-                    margin: 0,
-                    whiteSpace: 'pre-wrap',
-                    wordBreak: 'break-word',
-                    fontFamily: FONT,
-                    fontSize: FS2,
-                    color: T.sub,
-                    lineHeight: 1.6,
-                  },
-                },
-                mergeState.payload.text,
-              ),
-            )
-          : null,
-        notice
-          ? h(
-              'div',
-              {
-                style: {
-                  padding: '7px 16px',
-                  fontSize: 11.5,
-                  color: notice.tone,
-                  borderBottom: `${HAIRLINE} solid ${T.line}`,
-                  background: T.layer1,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 10,
-                },
-              },
-              h('span', { style: { flex: '1 1 auto' } }, notice.text),
-              h(
-                'button',
-                {
-                  type: 'button',
-                  className: 'ccs-ctl',
-                  title: '关闭提示',
-                  onClick: () => setNotice(null),
-                  style: {
-                    appearance: 'none',
-                    border: 'none',
-                    background: 'transparent',
-                    color: T.caption,
-                    cursor: 'pointer',
-                    padding: '0 2px',
-                    fontSize: 13,
-                    lineHeight: 1,
-                    fontFamily: 'inherit',
-                  },
-                },
-                '×',
-              ),
-            )
-          : null,
-        h(ManagedBand, { onChange: () => setTick((value) => value + 1) }),
-        error
-          ? h(
-              'div',
-              {
-                style: {
-                  margin: '12px 16px 0',
-                  padding: '8px 12px',
-                  borderRadius: 8,
-                  border: `${HAIRLINE} solid ${T.err}`,
-                  fontSize: FS2,
-                  color: T.err,
-                },
-              },
-              `读取失败：${error}`,
-            )
-          : null,
-        trashView
-          ? null
-          : h(
-          'div',
-          {
-            style: {
-              display: 'grid',
-              gridTemplateColumns: GRID,
-              gap: 10,
-              padding: '8px 16px 8px 12px',
-              marginTop: 10,
-              borderBottom: `1px solid ${T.line}`,
-              background: T.base,
-              fontSize: 10,
-              letterSpacing: '0.09em',
-              textTransform: 'uppercase',
-              color: T.caption,
-            },
-          },
-          h('span', null, ''),
-          h('span', null, '状态'),
-          h('span', null, '会话'),
-          h('span', null, '工作目录'),
-          h('span', { style: { textAlign: 'right' } }, '最后活动'),
-          h('span', { style: { textAlign: 'right' } }, '操作'),
-        ),
-        h(
-          'div',
-          { style: { flex: '1 1 auto', overflowY: 'auto', overflowX: 'hidden' } },
-          trashView
-            ? h(
-                'div',
-                { style: { display: 'flex', flexDirection: 'column' } },
-                h(
-                  'div',
-                  {
-                    style: {
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 10,
-                      padding: '10px 16px',
-                      borderBottom: `${HAIRLINE} solid ${T.line}`,
-                      flexWrap: 'wrap',
-                    },
-                  },
-                  h('span', { style: { fontSize: FS2, fontWeight: 600, color: T.text } }, '回收站'),
-                  h('span', { style: { fontSize: 11, color: T.caption } }, '删除的会话在这里，恢复会放回原位置'),
-                  h('span', { style: { flex: '1 1 auto' } }),
-                  h(
-                    GhostButton,
-                    { onClick: loadTrash, disabled: trashBusy === 'load' },
-                    trashBusy === 'load' ? '读取中…' : '刷新',
-                  ),
-                ),
-                trashError
-                  ? h('div', { style: { padding: '10px 16px', fontSize: FS2, color: T.err } }, `读取失败：${trashError}`)
-                  : null,
-                !trashEntries
-                  ? h(SkeletonRows, null)
-                  : trashEntries.length === 0
-                    ? h(
-                        'div',
-                        { style: { padding: '48px 16px', textAlign: 'center', fontSize: FS2, color: T.caption } },
-                        '回收站是空的',
-                      )
-                    : trashEntries.map((entry) =>
-                        h(TrashRow, {
-                          key: entry.entry,
-                          entry,
-                          busy: trashBusy === entry.entry || trashBusy === 'load',
-                          confirming: trashConfirm === entry.entry,
-                          onRestore: () => restoreEntry(entry),
-                          onPurge: () => purgeEntry(entry),
-                          onConfirm: () => setTrashConfirm(entry.entry),
-                          onCancel: () => setTrashConfirm(null),
-                        }),
-                      ),
-              )
-            : loading && !data
-              ? h(SkeletonRows, null)
-              : rows.length === 0
-                ? h(
-                    'div',
-                    {
-                      style: {
-                        padding: '48px 16px',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        gap: 6,
-                        color: T.caption,
-                      },
-                    },
-                    h('span', { style: { fontSize: FS2 } }, '没有匹配的会话'),
-                    h('span', { style: { fontSize: 11 } }, '换个筛选条件，或清空搜索词'),
-                  )
-                : rows.map((row) =>
-                    h(Row, {
-                      key: row.id,
-                      row,
-                      selected: selected.includes(row.id),
-                      onToggleSelect: toggleSelect,
-                      onTakeOver,
-                      onRelease: releaseSession,
-                      onOpen: chatEnabled ? openChat : undefined,
-                      onSubagents: chatEnabled ? openSubagents : undefined,
-                      onMeta: runMeta,
-                      onDelete: deleteOne,
-                      tagOptions: data?.tags ?? [],
-                    }),
-                  ),
         ),
         subView
           ? h(SubagentDrawer, {
@@ -5015,6 +4860,7 @@ window.__ModuleLoader__.load({
           : null,
       )
     }
+
 
     function PanelIcon() {
       return h(
@@ -5036,6 +4882,7 @@ window.__ModuleLoader__.load({
       __test: {
         SessionsPanel,
         Row,
+        TrashRow,
         ChatView,
         MessageList,
         QuestionCard,

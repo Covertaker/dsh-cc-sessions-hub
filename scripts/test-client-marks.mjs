@@ -149,9 +149,14 @@ function render() {
 }
 
 function openEditor() {
-  findByButton(tree, '⋯').props.onClick({ stopPropagation() {} })
-  render()
-  findByButton(tree, '标签与备注…').props.onClick({ stopPropagation() {} })
+  // 新行结构：⋯ 展开详情，详情里才出现「标签与备注」；已展开时不要再点（会收起）
+  if (!findByButton(tree, '标签与备注')) {
+    findByButton(tree, '⋯').props.onClick({ stopPropagation() {} })
+    render()
+  }
+  const edit = findByButton(tree, '标签与备注')
+  if (!edit) throw new Error('展开详情后找不到「标签与备注」')
+  edit.props.onClick({ stopPropagation() {} })
   render()
 }
 
@@ -197,6 +202,24 @@ check(
   '未回车的标签在保存时也被收下',
   Boolean(lastPending) && lastPending.tags.join(',') === '开发' && lastPending.note === '备注B',
   JSON.stringify(lastPending),
+)
+
+/* 面板外壳：data 为空时也要能渲染出侧栏（收藏入口）与空状态。 */
+const SessionsPanel = mod.__test.SessionsPanel
+store = []
+cursor = 0
+let panelTree = null
+let panelError = ''
+try {
+  panelTree = renderNode({ type: SessionsPanel, props: {} }, true)
+} catch (cause) {
+  panelError = String(cause?.message ?? cause)
+}
+const panelText = panelTree ? textOf(panelTree) : ''
+check(
+  '面板：新壳可渲染（收藏入口在侧栏）',
+  !panelError && panelText.includes('收藏') && panelText.includes('全部') && panelText.includes('回收站'),
+  panelError || panelText.slice(0, 90),
 )
 
 const failed = results.filter((result) => !result.ok)
