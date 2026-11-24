@@ -204,6 +204,32 @@ check(
   JSON.stringify(lastPending),
 )
 
+/* 场景 C：铅笔改名 */
+await new Promise((resolve) => setTimeout(resolve, 0))
+props.row = { ...baseRow, meta: { favorite: false, tags: [], note: '' } }
+store = []
+cursor = 0
+render()
+const pencil = findByButton(tree, '✎')
+check('重命名：行内有 ✎ 入口', Boolean(pencil))
+if (pencil) {
+  pencil.props.onClick({ stopPropagation() {} })
+  render()
+  const nameInput = findInput(tree, (p) => p.className === 'ccs-name-input')
+  if (!nameInput) throw new Error('点 ✎ 后没有出现改名输入框')
+  nameInput.props.onChange({ target: { value: '新名字' } })
+  render()
+  findInput(tree, (p) => p.className === 'ccs-name-input').props.onKeyDown({ key: 'Enter', preventDefault() {} })
+  const lastRename = calls[calls.length - 1]
+  check(
+    '重命名：请求体正确',
+    Boolean(lastRename) && lastRename.action === 'rename' && lastRename.ids[0] === id && lastRename.name === '新名字',
+    JSON.stringify(lastRename),
+  )
+} else {
+  check('重命名：请求体正确', false, '没有 ✎ 入口')
+}
+
 /* 面板外壳：data 为空时也要能渲染出侧栏（收藏入口）与空状态。 */
 const SessionsPanel = mod.__test.SessionsPanel
 store = []

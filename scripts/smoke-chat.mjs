@@ -494,11 +494,15 @@ check(
   const tagged = await applyMeta({ action: 'tags', ids: [id], add: ['材料', '开发', '材料'] })
   check('标记：标签去重', tagged.updated[id]?.tags.join(',') === '材料,开发', tagged.updated[id]?.tags.join(','))
   await applyMeta({ action: 'edit', ids: [id], tags: ['材料'], note: '下次接着做' })
+  await applyMeta({ action: 'rename', ids: [id], name: '  我的会话  ' })
   const rows = [{ id }]
   const vocabulary = await attachMeta(rows)
   check(
-    '标记：行上带收藏/标签/备注',
-    rows[0].meta.favorite === true && rows[0].meta.tags[0] === '材料' && rows[0].meta.note === '下次接着做',
+    '标记：行上带收藏/标签/备注/显示名',
+    rows[0].meta.favorite === true &&
+      rows[0].meta.tags[0] === '材料' &&
+      rows[0].meta.note === '下次接着做' &&
+      rows[0].meta.name === '我的会话',
     JSON.stringify(rows[0].meta),
   )
   check('标记：标签词表', vocabulary.length === 1 && vocabulary[0] === '材料', vocabulary.join(','))
@@ -525,8 +529,11 @@ check(
   const restored = [{ id }]
   await attachMeta(restored)
   check(
-    '恢复：收藏/标签/备注一起回来',
-    restored[0].meta.favorite === true && restored[0].meta.tags[0] === '材料' && restored[0].meta.note === '下次接着做',
+    '恢复：收藏/标签/备注/显示名一起回来',
+    restored[0].meta.favorite === true &&
+      restored[0].meta.tags[0] === '材料' &&
+      restored[0].meta.note === '下次接着做' &&
+      restored[0].meta.name === '我的会话',
     JSON.stringify(restored[0].meta),
   )
 

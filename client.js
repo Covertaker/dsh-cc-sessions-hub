@@ -250,6 +250,11 @@ window.__ModuleLoader__.load({
 .ccs-name { font-size: 13.5px; line-height: 1.5; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ccs-row[data-live="1"] .ccs-name { font-weight: 550; }
 .ccs-name.is-link { text-decoration: underline dotted transparent; text-underline-offset: 3px; }
+.ccs-name-input { width: min(320px, 60%); padding: 2px 6px; border: 1px solid color-mix(in srgb, var(--ccs-accent) 35%, var(--ccs-line)); border-radius: 5px; background: var(--ccs-surface); color: inherit; font: inherit; font-size: 13.5px; outline: none; box-shadow: 0 0 0 3px var(--ccs-accent-soft); }
+.ccs-rename { appearance: none; border: 0; background: transparent; color: var(--dsw-alias-label-caption, rgba(128,128,128,.62)); cursor: pointer; padding: 0 2px; font-size: 12px; line-height: 1; opacity: 0; transition: opacity 120ms cubic-bezier(.2,.8,.2,1); flex: none; }
+.ccs-row:hover .ccs-rename, .ccs-row.is-open .ccs-rename, .ccs-row:focus-within .ccs-rename { opacity: 1; }
+.ccs-rename:hover { color: var(--ccs-gold); }
+.ccs-rename:focus-visible { outline: 2px solid var(--ccs-accent); outline-offset: 2px; border-radius: 3px; }
 .ccs-name.is-link:hover { text-decoration-color: var(--ccs-line-strong); }
 .ccs-chips { display: flex; gap: 4px; flex: none; }
 .ccs-chip { font-size: 10px; line-height: 15px; padding: 0 6px; border-radius: 3px; border: 1px solid var(--ccs-line); color: var(--dsw-alias-label-secondary, rgba(128,128,128,.95)); background: var(--ccs-surface); white-space: nowrap; }
@@ -1101,6 +1106,7 @@ window.__ModuleLoader__.load({
         favorite: meta?.favorite === true,
         tags: Array.isArray(meta?.tags) ? meta.tags : [],
         note: typeof meta?.note === 'string' ? meta.note : '',
+        name: typeof meta?.name === 'string' ? meta.name : '',
       }
     }
     function dayBucket(ms) {
@@ -1175,6 +1181,10 @@ window.__ModuleLoader__.load({
       const title = topic || row.name || shortId(row.id)
       const meta = metaOf(row)
       const status = statusOf(row)
+      const displayTitle = meta.name || title
+      const [renaming, setRenaming] = React.useState(false)
+      const [nameDraft, setNameDraft] = React.useState('')
+      const skipNameBlur = React.useRef(false)
 
       const run = (fork) => {
         if (busy) return
@@ -1224,6 +1234,23 @@ window.__ModuleLoader__.load({
           setTagInput('')
           setEditing(false)
         })
+      }
+
+      const startRename = () => {
+        setNameDraft(meta.name)
+        setOpen(true)
+        setRenaming(true)
+      }
+
+      const saveName = () =>
+        runMeta({ action: 'rename', ids: [row.id], name: nameDraft }).then((payload) => {
+          if (payload) setRenaming(false)
+          return payload
+        })
+
+      const cancelRename = () => {
+        skipNameBlur.current = true
+        setRenaming(false)
       }
 
       const removeRow = () => {
@@ -1277,21 +1304,62 @@ window.__ModuleLoader__.load({
           h(
             'div',
             { className: 'ccs-line1' },
-            h(
-              'span',
-              {
-                className: `ccs-name${resumable && onOpen ? ' is-link' : ''}`,
-                title: resumable && onOpen ? `${title} — 点击进入对话` : title,
-                onClick:
-                  resumable && onOpen
-                    ? (event) => {
-                        event.stopPropagation()
-                        onOpen(row)
-                      }
-                    : undefined,
-              },
-              title,
-            ),
+            renaming
+              ? h('input', {
+                  className: 'ccs-name-input',
+                  value: nameDraft,
+                  placeholder: topic || '给它起个名字',
+                  maxLength: 80,
+                  autoFocus: true,
+                  onClick: (event) => event.stopPropagation(),
+                  onChange: (event) => setNameDraft(event.target.value),
+                  onKeyDown: (event) => {
+                    if (event.key === 'Enter') {
+                      event.preventDefault()
+                      saveName()
+                    } else if (event.key === 'Escape') {
+                      event.preventDefault()
+                      cancelRename()
+                    }
+                  },
+                  onBlur: () => {
+                    if (skipNameBlur.current) {
+                      skipNameBlur.current = false
+                      return
+                    }
+                    saveName()
+                  },
+                })
+              : h(
+                  'span',
+                  {
+                    className: `ccs-name${resumable && onOpen ? ' is-link' : ''}`,
+                    title: `${meta.name ? `原题：${topic} · ` : ''}${resumable && onOpen ? '点击进入对话；' : ''}点 ✎ 改名`,
+                    onClick:
+                      resumable && onOpen
+                        ? (event) => {
+                            event.stopPropagation()
+                            onOpen(row)
+                          }
+                        : undefined,
+                  },
+                  displayTitle,
+                ),
+            renaming
+              ? null
+              : h(
+                  'button',
+                  {
+                    type: 'button',
+                    className: 'ccs-rename',
+                    title: '重命名',
+                    onClick: (event) => {
+                      event.stopPropagation()
+                      startRename()
+                    },
+                  },
+                  '✎',
+                ),
             meta.tags.length > 0
               ? h(
                   'span',
@@ -1340,6 +1408,8 @@ window.__ModuleLoader__.load({
                 h('dd', null, `${absoluteTime(row.mtime ?? row.startedAt)} · ${sizeText(row.size)}`),
                 h('dt', null, '最后一问'),
                 h('dd', null, row.preview || '—'),
+                meta.name && topic && meta.name !== topic ? h('dt', null, '原题') : null,
+                meta.name && topic && meta.name !== topic ? h('dd', null, topic) : null,
               ),
               h(
                 'div',
@@ -1376,6 +1446,7 @@ window.__ModuleLoader__.load({
                     })
                   : null,
                 h(Action, { onClick: () => setShowDigest((value) => !value) }, showDigest ? '收起摘要' : '摘要'),
+                h(Action, { onClick: startRename }, '重命名'),
                 h(Action, { onClick: openEditor }, '标签与备注'),
                 resumable
                   ? h(
@@ -1464,7 +1535,7 @@ window.__ModuleLoader__.load({
                 ? h(
                     'div',
                     { className: 'ccs-confirm' },
-                    h('span', null, `删除「${title}」？转录、子代理过程、文件历史会移进回收站，可在「回收站」恢复。`),
+                    h('span', null, `删除「${displayTitle}」？转录、子代理过程、文件历史会移进回收站，可在「回收站」恢复。`),
                     h(Action, { danger: true, onClick: removeRow, disabled: metaBusy }, metaBusy ? '处理中…' : '移入回收站'),
                     h(Action, { onClick: () => setConfirmDelete(false) }, '取消'),
                   )
@@ -4336,6 +4407,7 @@ window.__ModuleLoader__.load({
             row.kind,
             metaOf(row).tags.join(' '),
             metaOf(row).note,
+            metaOf(row).name,
           ]
             .filter(Boolean)
             .some((field) => String(field).toLowerCase().includes(needle)),

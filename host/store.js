@@ -25,7 +25,8 @@ const ID_OK = /^[A-Za-z0-9._-]{1,64}$/
 const MAX_TAGS = 12
 const MAX_TAG_LEN = 24
 const MAX_NOTE = 500
-const EMPTY = { favorite: false, tags: [], note: '' }
+const MAX_NAME = 80
+const EMPTY = { favorite: false, tags: [], note: '', name: '' }
 
 function httpError(status, message) {
   return Object.assign(new Error(message), { status })
@@ -91,19 +92,25 @@ function normalizeNote(value) {
   return String(value ?? '').trim().slice(0, MAX_NOTE)
 }
 
+/** Display name; empty means "fall back to the transcript's own title". */
+function normalizeName(value) {
+  return String(value ?? '').trim().replace(/\s+/g, ' ').slice(0, MAX_NAME)
+}
+
 function normalizeRecord(raw) {
   if (!raw || typeof raw !== 'object') return null
   const record = {
     favorite: raw.favorite === true,
     tags: normalizeTags(raw.tags),
     note: normalizeNote(raw.note),
+    name: normalizeName(raw.name),
   }
   if (raw.updatedAt) record.updatedAt = String(raw.updatedAt)
   return isEmpty(record) ? null : record
 }
 
 function isEmpty(record) {
-  return !record || (record.favorite !== true && record.tags.length === 0 && record.note === '')
+  return !record || (record.favorite !== true && record.tags.length === 0 && record.note === '' && record.name === '')
 }
 
 function normalizeStore(raw) {
@@ -200,7 +207,7 @@ export async function applyMeta(input = {}) {
   if (ids.length === 0) throw httpError(400, '缺少会话 id')
   if (ids.length > 200) throw httpError(400, '一次最多 200 条 id')
   if (!ids.every((id) => ID_OK.test(id))) throw httpError(400, '会话 id 不合法')
-  const known = new Set(['favorite', 'tags', 'note', 'edit'])
+  const known = new Set(['favorite', 'tags', 'note', 'rename', 'edit'])
   if (!known.has(action)) throw httpError(400, `未知操作 ${action}`)
 
   return enqueue(async () => {
@@ -213,6 +220,7 @@ export async function applyMeta(input = {}) {
         favorite: previous.favorite === true,
         tags: [...(previous.tags ?? [])],
         note: previous.note ?? '',
+        name: previous.name ?? '',
       }
       if (action === 'favorite') {
         record.favorite = input.value === true
@@ -226,9 +234,12 @@ export async function applyMeta(input = {}) {
         }
       } else if (action === 'note') {
         record.note = normalizeNote(input.note)
+      } else if (action === 'rename') {
+        record.name = normalizeName(input.name)
       } else {
         if (Array.isArray(input.tags)) record.tags = normalizeTags(input.tags)
         if (Object.prototype.hasOwnProperty.call(input, 'note')) record.note = normalizeNote(input.note)
+        if (Object.prototype.hasOwnProperty.call(input, 'name')) record.name = normalizeName(input.name)
         if (Object.prototype.hasOwnProperty.call(input, 'favorite')) record.favorite = input.favorite === true
       }
       record.tags = record.tags.slice(0, MAX_TAGS)
@@ -443,6 +454,7 @@ export async function restoreTrash(name) {
           favorite: previous?.favorite === true || snapshot.favorite === true,
           tags: normalizeTags([...(previous?.tags ?? []), ...(snapshot.tags ?? [])]),
           note: previous?.note || snapshot.note || '',
+          name: previous?.name || snapshot.name || '',
           updatedAt: new Date().toISOString(),
         }
         if (!isEmpty(merged)) store.sessions[manifest.id] = merged
